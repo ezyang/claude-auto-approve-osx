@@ -14,3 +14,10 @@ dependencies = [
     "pyobjc-framework-quartz>=7.3",
     "pytesseract>=0.3.8",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+claude-auto-approve-osx = "claude_auto_approve_osx:main"
