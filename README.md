@@ -22,15 +22,10 @@ cd osx-clicker
 brew install tesseract
 ```
 
-3. Install Python dependencies:
+3. Run
 ```
-pip install -r requirements.txt
+uvx .
 ```
-
-4. Create the required template images:
-   - `approve_button.png`: A screenshot of the approval button in Claude
-   - `dialog_template.png`: A screenshot of the tool approval dialog box
-   - `dialog_template_expanded.png`: (Optional) A variant of the dialog with expanded view
 
 ## Usage
 
