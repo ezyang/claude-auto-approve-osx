@@ -1007,7 +1007,7 @@ class AutoApprover:
             logger.error(f"Error in auto_approve: {e}")
             return False, "error"
 
-    def debug_capture(self) -> None:
+def debug_capture(self) -> None:
         """Capture a single screenshot and save debug information.
 
         This method:
@@ -1104,7 +1104,7 @@ class AutoApprover:
         <p><strong>Confidence Threshold:</strong> {self.config.confidence_threshold}</p>
         <p><strong>Dialog Confidence Threshold:</strong> {self.config.dialog_confidence}</p>
     </div>
-    
+
     <h2>Window Screenshots (Comparison)</h2>
     <div class="image-container">
         <div class="image-item">
@@ -1116,7 +1116,7 @@ class AutoApprover:
             <div class="image-caption">Screen Capture (MSS)</div>
         </div>
     </div>
-    
+
     <h2>Button Template</h2>
     <div class="image-container">
         <div class="image-item">
@@ -1124,7 +1124,7 @@ class AutoApprover:
             <div class="image-caption">Approve Button Template</div>
         </div>
     </div>
-    
+
     <h2>Dialog Templates</h2>
     <div class="image-container">
 """)
@@ -1206,6 +1206,149 @@ class AutoApprover:
             logger.info("Script stopped by user")
 
 
+class AccessibilityAutoApprover:
+    """Automatically approves tool requests in the Claude desktop app using macOS Accessibility APIs.
+
+    This class detects and processes approval requests from the Claude application by using
+    the macOS Accessibility APIs to find and interact with UI elements directly, rather than
+    using image recognition. This provides a more reliable way to detect and click buttons
+    regardless of visual appearance or window occlusion.
+
+    Attributes:
+        config: Configuration singleton with settings.
+        previous_foreground_app: Stores information about the previously focused app.
+    """
+
+    def __init__(self) -> None:
+        """Initialize AccessibilityAutoApprover with required services and configuration."""
+        self.config = Config()
+        self.previous_foreground_app = None
+
+    def is_tool_allowed(self, tool_name: str) -> bool:
+        """Check if the requested tool is in the allowed list.
+
+        Args:
+            tool_name: Name of the tool being requested.
+
+        Returns:
+            bool: True if the tool is allowed, False otherwise.
+        """
+        return tool_name in self.config.allowed_tools
+
+    def auto_approve(self) -> Tuple[bool, Optional[str]]:
+        """Find and click the 'Allow for This Chat' button using accessibility APIs.
+
+        This method:
+        1. Finds the Claude application
+        2. Searches for the 'Allow for This Chat' button in any window/dialog
+        3. Presses the button if found
+        
+        Returns:
+            Tuple[bool, Optional[str]]:
+                - First value: Whether a button was found and clicked.
+                - Second value: Reason code for failures or None on success.
+                  Possible values: "no_window", "button_not_found", "error"
+        """
+        try:
+            # Save the currently focused app before potentially switching
+            self.previous_foreground_app = get_frontmost_app()
+            
+            # Find the 'Allow for This Chat' button
+            button = find_allow_button_in_claude()
+            
+            if not button:
+                logger.info("Allow button not found via accessibility")
+                return False, "button_not_found"
+                
+            # Press the button
+            logger.info("Found 'Allow for This Chat' button, pressing it")
+            success = perform_press_action(button)
+            
+            # Restore the previously focused app
+            if self.previous_foreground_app:
+                logger.info(
+                    f"Restoring previous foreground app: {self.previous_foreground_app['name']}"
+                )
+                app_instance = self.previous_foreground_app.get("app_instance")
+                if app_instance:
+                    app_instance.activateWithOptions_(
+                        NSApplicationActivateIgnoringOtherApps
+                    )
+                else:
+                    # Fallback using bundle ID if app instance not available
+                    bundle_id = self.previous_foreground_app.get("bundle_id")
+                    if bundle_id:
+                        activate_app_by_bundle_id(bundle_id)
+                    else:
+                        # Last resort, try by name
+                        activate_app_by_name(
+                            self.previous_foreground_app.get("name", "")
+                        )
+                time.sleep(0.1)  # Short delay to ensure app is focused
+                
+            return not success, None
+            
+        except Exception as e:
+            logger.error(f"Error in auto_approve (accessibility): {e}")
+            return False, "error"
+            
+    def debug_accessibility(self) -> None:
+        """Dump the accessibility hierarchy for debugging purposes.
+        
+        This method queries the Claude application's accessibility hierarchy
+        and saves it to a text file in the debug directory.
+        """
+        debug_dir = self.config.debug_dir
+        debug_dir.mkdir(exist_ok=True)
+        
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        hierarchy = dump_application_hierarchy("Claude")
+        
+        # Save the hierarchy to a file
+        hierarchy_path = debug_dir / f"accessibility_hierarchy-{timestamp}.txt"
+        with open(hierarchy_path, "w") as f:
+            f.write(hierarchy)
+            
+        logger.info(f"Saved accessibility hierarchy to {hierarchy_path}")
+        
+    def run(self):
+        """Main execution loop with dynamic delay between checks.
+
+        Continuously monitors for approval buttons with adaptive delay times
+        based on detection results. Runs until interrupted by user with Ctrl+C.
+        """
+        logger.info("Starting accessibility-based auto-approval script for Claude")
+
+        # If debug mode is enabled, just dump the accessibility hierarchy and exit
+        if self.config.debug_mode:
+            logger.info("Running in debug mode - will dump accessibility hierarchy and exit")
+            self.debug_accessibility()
+            logger.info("Debug dump complete. Exiting.")
+            return
+
+        print("Press Ctrl+C to stop the script")
+        current_delay = self.config.normal_delay
+
+        try:
+            while True:
+                result, reason = self.auto_approve()
+
+                if reason == "no_window":
+                    logger.info("Claude application not found")
+                    current_delay = self.config.no_window_delay
+                elif reason == "button_not_found":
+                    logger.info("Allow button not found")
+                    current_delay = self.config.no_image_delay
+                else:
+                    current_delay = self.config.normal_delay
+
+                logger.info(f"Waiting {current_delay} seconds before next check")
+                time.sleep(current_delay)
+
+        except KeyboardInterrupt:
+            logger.info("Script stopped by user")
+
+
 def main():
     """Main entry point with command-line argument handling.
 
@@ -1226,7 +1369,7 @@ def main():
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Run in debug mode (dump debug info and exit)",
+        help="Run in debug mode (capture single screenshot and exit)",
     )
     parser.add_argument(
         "--confidence",
