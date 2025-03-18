@@ -116,30 +116,23 @@ def find_element_with_role_and_title(parent, role, title=None):
         The matching accessibility element, or None if not found.
     """
     if parent is None:
-        logger.debug(f"Parent element is None, cannot search for {role}")
         return None
         
     role_value = get_ax_attribute_value(parent, "AXRole")
     title_value = get_ax_attribute_value(parent, "AXTitle")
     
-    logger.debug(f"Element role: {role_value}, title: {title_value}")
-    
     # If this element matches the criteria, return it
     if role_value == role:
         if title is None or (title_value and title.lower() in title_value.lower()):
-            logger.debug(f"Found matching element with role: {role}, title: {title_value}")
             return parent
     
     # Recursively check children
     children = get_ax_attribute_value(parent, "AXChildren")
     if children:
-        logger.debug(f"Checking {len(children)} children")
         for child in children:
             result = find_element_with_role_and_title(child, role, title)
             if result:
                 return result
-    else:
-        logger.debug("No children to check")
                 
     return None
 
@@ -179,12 +172,8 @@ def perform_press_action(element):
     if element is None:
         return False
         
-    logger.info("Pressing")
-    #error = Quartz.AXUIElementPerformAction(element, "AXPress")
-    breakpoint()
+    # Perform the button press
     HIServices.AXUIElementPerformAction(element, "AXPress")
-    logger.info("Press result")
-    #return error == 0
     return True
 
 def get_application_by_name(app_name):
@@ -460,9 +449,9 @@ def find_allow_button_in_claude():
                         return btn
                         
                 # Check if there's text mentioning "codemcp" in the dialog
-                logger.info("Looking for text mentioning 'codemcp'...")
+                logger.debug("Looking for text mentioning 'codemcp'...")
                 static_texts = find_all_elements_with_role(dialog, "AXStaticText")
-                logger.info(f"Found {len(static_texts)} text elements")
+                logger.debug(f"Found {len(static_texts)} text elements")
                 
                 codemcp_found = False
                 for text_element in static_texts:
@@ -541,7 +530,6 @@ def find_all_elements_with_role(parent, role):
         title_value = get_ax_attribute_value(element, "AXTitle") or ""
         
         if role_value == role:
-            logger.debug(f"Found element with role {role}, title: '{title_value}'")
             results.append(element)
         
         # Recursively check children
@@ -551,7 +539,6 @@ def find_all_elements_with_role(parent, role):
                 traverse(child)
                 
     traverse(parent)
-    logger.debug(f"Found {len(results)} elements with role {role}")
     return results
 
 def get_element_position(element):

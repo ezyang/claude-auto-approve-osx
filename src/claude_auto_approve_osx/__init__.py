@@ -21,7 +21,7 @@ from claude_auto_approve_osx.accessibility_utils import (
     dump_application_hierarchy,
 )
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -143,18 +143,19 @@ class AccessibilityAutoApprover:
             button = find_allow_button_in_claude()
 
             if not button:
-                logger.info("Allow button not found via accessibility")
+                logger.debug("Allow button not found via accessibility")
                 return False, "button_not_found"
 
             # Press the button
-            logger.info("Found 'Allow for This Chat' button, pressing it")
+            logger.info("Found and pressing 'Allow' button")
             success = perform_press_action(button)
 
             # Restore the previously focused app
             if self.previous_foreground_app:
-                logger.info(
-                    f"Restoring previous foreground app: {self.previous_foreground_app['name']}"
-                )
+                # Only log at debug level
+                app_name = self.previous_foreground_app.get("name", "unknown")
+                logger.debug(f"Restoring previous foreground app: {app_name}")
+                
                 app_instance = self.previous_foreground_app.get("app_instance")
                 if app_instance:
                     app_instance.activateWithOptions_(
@@ -220,15 +221,15 @@ class AccessibilityAutoApprover:
                 result, reason = self.auto_approve()
 
                 if reason == "no_window":
-                    logger.info("Claude application not found")
+                    logger.debug("Claude application not found")
                     current_delay = self.config.no_window_delay
                 elif reason == "button_not_found":
-                    logger.info("Allow button not found")
+                    logger.debug("Allow button not found")
                     current_delay = self.config.no_image_delay
                 else:
                     current_delay = self.config.normal_delay
 
-                logger.info(f"Waiting {current_delay} seconds before next check")
+                logger.debug(f"Waiting {current_delay} seconds before next check")
                 time.sleep(current_delay)
 
         except KeyboardInterrupt:

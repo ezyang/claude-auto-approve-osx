@@ -36,14 +36,14 @@ def activate_app_by_name(app_name: str) -> bool:
     # Try exact match first
     for app in apps:
         if app.localizedName() == app_name:
-            logger.info(f"Focusing {app_name} application")
+            logger.debug(f"Focusing {app_name} application")
             app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
             return True
 
     # If exact match fails, try case-insensitive match or contains
     for app in apps:
         if app_name.lower() in app.localizedName().lower():
-            logger.info(
+            logger.debug(
                 f"Focusing app with name containing '{app_name}': {app.localizedName()}"
             )
             app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
@@ -65,7 +65,7 @@ def activate_app_by_bundle_id(bundle_id: str) -> bool:
 
     for app in apps:
         if app.bundleIdentifier() == bundle_id:
-            logger.info(f"Focusing application with bundle ID {bundle_id}")
+            logger.debug(f"Focusing application with bundle ID {bundle_id}")
             app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
             return True
 
