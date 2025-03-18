@@ -2,6 +2,8 @@
 
 This tool automatically approves selected tool requests in the Claude desktop application on macOS. It uses computer vision and OCR to detect and interact with approval dialogs.
 
+This is an OSX port of @Richard-Weiss's Windows auto-approver https://gist.github.com/Richard-Weiss/1ecfee909d839367001199ad179fad28
+
 ## Prerequisites
 
 - macOS
