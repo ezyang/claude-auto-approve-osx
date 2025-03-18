@@ -87,6 +87,7 @@ def get_ax_attribute_value(element, attribute):
     error, value = AXUIElementCopyAttributeValue(element, attribute, None)
     
     if error:
+        logger.debug(f"Error getting attribute '{attribute}': {error}")
         return None
     return value
 
@@ -114,23 +115,30 @@ def find_element_with_role_and_title(parent, role, title=None):
         The matching accessibility element, or None if not found.
     """
     if parent is None:
+        logger.debug(f"Parent element is None, cannot search for {role}")
         return None
         
     role_value = get_ax_attribute_value(parent, "AXRole")
     title_value = get_ax_attribute_value(parent, "AXTitle")
     
+    logger.debug(f"Element role: {role_value}, title: {title_value}")
+    
     # If this element matches the criteria, return it
     if role_value == role:
         if title is None or (title_value and title.lower() in title_value.lower()):
+            logger.debug(f"Found matching element with role: {role}, title: {title_value}")
             return parent
     
     # Recursively check children
     children = get_ax_attribute_value(parent, "AXChildren")
     if children:
+        logger.debug(f"Checking {len(children)} children")
         for child in children:
             result = find_element_with_role_and_title(child, role, title)
             if result:
                 return result
+    else:
+        logger.debug("No children to check")
                 
     return None
 
@@ -184,8 +192,27 @@ def get_application_by_name(app_name):
     """
     app_info = find_app_by_name(app_name)
     if not app_info:
+        logger.warning(f"Application '{app_name}' not found in running applications")
         return None
-    return create_ax_ui_element_from_pid(app_info["pid"])
+        
+    logger.info(f"Found application '{app_name}' with PID {app_info['pid']}")
+    
+    try:
+        app_element = create_ax_ui_element_from_pid(app_info["pid"])
+        if app_element:
+            # Check if we can actually access the element - will fail if accessibility permissions are missing
+            windows = get_ax_attribute_value(app_element, "AXWindows")
+            if windows is None:
+                logger.error("Failed to access application's windows - check Accessibility permissions")
+                logger.error("Please grant Terminal (or your Python app) Accessibility access in:")
+                logger.error("System Preferences > Security & Privacy > Privacy > Accessibility")
+            return app_element
+        else:
+            logger.warning(f"Failed to create accessibility element for '{app_name}'")
+            return None
+    except Exception as e:
+        logger.error(f"Error getting application by name: {e}")
+        return None
 
 def click_button_in_dialog(app_name, dialog_title, button_title):
     """Find and click a button in a dialog of the specified application.
@@ -276,22 +303,58 @@ def dump_application_hierarchy(app_name, max_depth=3):
             output.append(f"{'  ' * depth}[Max depth reached]")
             return
             
-        attrs = get_element_attributes(element)
-        role = attrs.get('AXRole', 'Unknown')
-        title = attrs.get('AXTitle', '')
-        subrole = attrs.get('AXSubrole', '')
+        # Get all attributes and error codes
+        error, attr_names = Quartz.AXUIElementCopyAttributeNames(element, None)
+        if error:
+            output.append(f"{'  ' * depth}[Error getting attribute names: {error}]")
+            return
+            
+        # Get role and title with error codes
+        role = "Unknown"
+        title = ""
+        role_error, role_value = AXUIElementCopyAttributeValue(element, "AXRole", None)
+        if role_error:
+            role = f"Unknown (error: {role_error})"
+        else:
+            role = role_value
+            
+        title_error, title_value = AXUIElementCopyAttributeValue(element, "AXTitle", None)
+        if title_error:
+            title = f"[Error: {title_error}]"
+        else:
+            title = title_value or ""
+            
+        # Get all attributes with error codes
+        all_attrs = {}
+        for attr in attr_names:
+            err, value = AXUIElementCopyAttributeValue(element, attr, None)
+            if err:
+                all_attrs[attr] = f"[Error: {err}]"
+            else:
+                # Convert complex objects to strings for easier logging
+                if hasattr(value, 'description'):
+                    all_attrs[attr] = value.description()
+                else:
+                    all_attrs[attr] = str(value)
         
         # Format the current element
         element_str = f"{'  ' * depth}{role}"
         if title:
             element_str += f" ('{title}')"
-        if subrole:
-            element_str += f" [Subrole: {subrole}]"
             
         output.append(element_str)
         
+        # Add interesting attributes
+        for attr, value in all_attrs.items():
+            if attr not in ["AXRole", "AXTitle", "AXChildren"] and not attr.startswith("AX"):
+                output.append(f"{'  ' * (depth+1)}{attr}: {value}")
+        
         # Traverse children
-        children = get_ax_attribute_value(element, "AXChildren")
+        children_error, children = AXUIElementCopyAttributeValue(element, "AXChildren", None)
+        if children_error:
+            output.append(f"{'  ' * (depth+1)}[Error getting children: {children_error}]")
+            return
+            
         if children:
             for i, child in enumerate(children):
                 traverse(child, depth + 1, f"{path}.{i}")
@@ -299,10 +362,27 @@ def dump_application_hierarchy(app_name, max_depth=3):
     # Start traversal with windows
     windows = get_ax_window_list(app_element)
     if not windows:
-        output.append("No windows found")
+        output.append("No windows found or error getting windows")
+        
+        # Try to get raw window info
+        error, attr_names = Quartz.AXUIElementCopyAttributeNames(app_element, None)
+        if error:
+            output.append(f"Error getting app attributes: {error}")
+        else:
+            output.append("Application attributes:")
+            for attr in attr_names:
+                err, value = AXUIElementCopyAttributeValue(app_element, attr, None)
+                if err:
+                    output.append(f"  {attr}: [Error: {err}]")
+                else:
+                    output.append(f"  {attr}: {value}")
     else:
         for i, window in enumerate(windows):
-            window_title = get_ax_attribute_value(window, "AXTitle") or "Untitled Window"
+            window_title = "Untitled Window"
+            title_error, title_value = AXUIElementCopyAttributeValue(window, "AXTitle", None)
+            if not title_error and title_value:
+                window_title = title_value
+                
             output.append(f"\nWindow {i+1}: '{window_title}'")
             traverse(window, 0, f"{i}")
             
@@ -329,54 +409,109 @@ def find_allow_button_in_claude():
         logger.warning("No windows found for Claude application")
         return None
     
+    logger.info(f"Found {len(windows)} windows in Claude application")
+    
+    # Collect all discovered buttons for logging
+    all_discovered_buttons = []
+    all_discovered_dialogs = []
+    
     # Look for dialog containing "Allow for This Chat" button
-    for window in windows:
+    for window_index, window in enumerate(windows):
+        logger.info(f"Searching window {window_index+1}/{len(windows)}")
+        
+        window_title = get_ax_attribute_value(window, "AXTitle") or "Untitled Window"
+        logger.info(f"Window title: '{window_title}'")
+        
         # First try to find a dialog that might be the tool confirmation dialog
         for dialog_role in ["AXSheet", "AXDialog", "AXGroup"]:
+            logger.info(f"Looking for dialog role: {dialog_role}")
             dialogs = find_all_elements_with_role(window, dialog_role)
-            for dialog in dialogs:
+            logger.info(f"Found {len(dialogs)} elements with role {dialog_role}")
+            
+            all_discovered_dialogs.extend([(dialog_role, get_ax_attribute_value(d, "AXTitle") or "Untitled") for d in dialogs])
+            
+            for dialog_index, dialog in enumerate(dialogs):
+                dialog_title = get_ax_attribute_value(dialog, "AXTitle") or "Untitled Dialog"
+                logger.info(f"Checking dialog {dialog_index+1}/{len(dialogs)} with title: '{dialog_title}'")
+                
                 # First try to find the exact button
+                logger.info("Looking for 'Allow for This Chat' button...")
                 button = find_button_with_title(dialog, "Allow for This Chat")
                 if button:
-                    logger.info("Found 'Allow for This Chat' button in dialog")
+                    logger.info("✓ Found 'Allow for This Chat' button in dialog")
                     return button
                 
                 # If not found, look for any button with "Allow" in its title
+                logger.info("Looking for any button with 'Allow' in title...")
                 all_buttons = find_all_elements_with_role(dialog, "AXButton")
+                logger.info(f"Found {len(all_buttons)} buttons in dialog")
+                
                 for btn in all_buttons:
                     title = get_ax_attribute_value(btn, "AXTitle")
+                    all_discovered_buttons.append(title)
                     if title and "Allow" in title:
-                        logger.info(f"Found allow button with title: '{title}'")
+                        logger.info(f"✓ Found allow button with title: '{title}'")
                         return btn
                         
                 # Check if there's text mentioning "codemcp" in the dialog
+                logger.info("Looking for text mentioning 'codemcp'...")
                 static_texts = find_all_elements_with_role(dialog, "AXStaticText")
+                logger.info(f"Found {len(static_texts)} text elements")
+                
+                codemcp_found = False
                 for text_element in static_texts:
                     text_value = get_ax_attribute_value(text_element, "AXValue")
+                    if text_value:
+                        logger.debug(f"Text content: {text_value[:100]}...")
                     if text_value and "codemcp" in text_value.lower():
                         # If we found a dialog about codemcp, look harder for any button
-                        logger.info("Found dialog mentioning 'codemcp'")
+                        logger.info("✓ Found dialog mentioning 'codemcp'")
+                        codemcp_found = True
                         all_buttons = find_all_elements_with_role(dialog, "AXButton")
+                        logger.info(f"Looking through {len(all_buttons)} buttons for approval button")
                         # Return the first button that isn't "Don't Allow"
                         for btn in all_buttons:
                             title = get_ax_attribute_value(btn, "AXTitle")
+                            all_discovered_buttons.append(title)
                             if title and "don't" not in title.lower() and "cancel" not in title.lower():
-                                logger.info(f"Found approval button with title: '{title}'")
+                                logger.info(f"✓ Found approval button with title: '{title}'")
                                 return btn
+                
+                if not codemcp_found:
+                    logger.debug("No text mentioning 'codemcp' found in this dialog")
         
         # If not found in dialogs, also look directly in the window
+        logger.info("Looking for 'Allow for This Chat' button directly in window...")
         button = find_button_with_title(window, "Allow for This Chat")
         if button:
-            logger.info("Found 'Allow for This Chat' button directly in window")
+            logger.info("✓ Found 'Allow for This Chat' button directly in window")
             return button
             
         # Also check for any button with "Allow" in its title
+        logger.info("Looking for any Allow button directly in window...")
         all_buttons = find_all_elements_with_role(window, "AXButton")
+        logger.info(f"Found {len(all_buttons)} buttons in window")
+        
         for btn in all_buttons:
             title = get_ax_attribute_value(btn, "AXTitle")
+            all_discovered_buttons.append(title)
             if title and "Allow" in title and "don't" not in title.lower():
-                logger.info(f"Found allow button with title: '{title}' directly in window")
+                logger.info(f"✓ Found allow button with title: '{title}' directly in window")
                 return btn
+    
+    # Log all discovered buttons for debugging
+    logger.info("No allow button found after full search")
+    if all_discovered_buttons:
+        unique_buttons = set([str(btn) for btn in all_discovered_buttons if btn])
+        logger.info(f"All button titles found: {', '.join(unique_buttons)}")
+    else:
+        logger.info("No buttons found in any window")
+        
+    if all_discovered_dialogs:
+        unique_dialogs = set([f"{role}:'{title}'" for role, title in all_discovered_dialogs])
+        logger.info(f"All dialog types found: {', '.join(unique_dialogs)}")
+    else:
+        logger.info("No dialogs/groups found in any window")
             
     return None
 
@@ -397,8 +532,10 @@ def find_all_elements_with_role(parent, role):
             return
             
         role_value = get_ax_attribute_value(element, "AXRole")
+        title_value = get_ax_attribute_value(element, "AXTitle") or ""
         
         if role_value == role:
+            logger.debug(f"Found element with role {role}, title: '{title_value}'")
             results.append(element)
         
         # Recursively check children
@@ -408,4 +545,121 @@ def find_all_elements_with_role(parent, role):
                 traverse(child)
                 
     traverse(parent)
+    logger.debug(f"Found {len(results)} elements with role {role}")
     return results
+
+def get_element_position(element):
+    """Get the position of an accessibility element.
+    
+    Args:
+        element: The accessibility element.
+        
+    Returns:
+        tuple: (x, y, width, height) or None if position can't be determined.
+    """
+    position = get_ax_attribute_value(element, "AXPosition")
+    size = get_ax_attribute_value(element, "AXSize")
+    
+    if position and size:
+        try:
+            x = position.x()
+            y = position.y()
+            width = size.width()
+            height = size.height()
+            return (x, y, width, height)
+        except Exception as e:
+            logger.debug(f"Error getting element position: {e}")
+            return None
+    return None
+
+def check_for_codemcp_dialog():
+    """Specifically look for the dialog that might contain 'codemcp' text.
+    
+    This intensive debug function:
+    1. Finds the Claude application
+    2. Examines all windows and their elements
+    3. Checks all text elements for 'codemcp' text
+    4. Identifies all nearby buttons
+    
+    Returns:
+        dict: Debug information about the search
+    """
+    result = {
+        "found_codemcp_text": False,
+        "all_buttons": [],
+        "all_text": [],
+        "all_windows": []
+    }
+    
+    app_element = get_application_by_name("Claude")
+    if not app_element:
+        logger.warning("Claude application not found")
+        return result
+        
+    # Get the application's windows
+    windows = get_ax_window_list(app_element)
+    if not windows:
+        logger.warning("No windows found for Claude application")
+        return result
+    
+    logger.info(f"Found {len(windows)} windows in Claude application")
+    
+    # Look at all windows
+    for window_index, window in enumerate(windows):
+        window_title = get_ax_attribute_value(window, "AXTitle") or "Untitled Window"
+        window_role = get_ax_attribute_value(window, "AXRole") or "Unknown Role"
+        window_info = {
+            "index": window_index,
+            "title": window_title,
+            "role": window_role
+        }
+        result["all_windows"].append(window_info)
+        
+        # Get all text elements in this window
+        all_text_elements = find_all_elements_with_role(window, "AXStaticText")
+        logger.info(f"Window {window_index+1}: '{window_title}' has {len(all_text_elements)} text elements")
+        
+        # Check all text elements
+        for text_index, text_element in enumerate(all_text_elements):
+            text_value = get_ax_attribute_value(text_element, "AXValue")
+            
+            if not text_value:
+                text_value = ""
+                
+            text_info = {
+                "window_index": window_index,
+                "text_index": text_index,
+                "value": text_value[:100] + ("..." if len(text_value) > 100 else "")
+            }
+            result["all_text"].append(text_info)
+            
+            # Check for "codemcp" in the text
+            if "codemcp" in text_value.lower():
+                result["found_codemcp_text"] = True
+                logger.info(f"Found text with 'codemcp' in window {window_index+1}")
+                logger.info(f"Text content: {text_value[:200]}...")
+                
+                # Find parent dialog/group
+                # (We would need helper functions to traverse up the accessibility hierarchy)
+                
+                # Find all buttons in this window
+                all_buttons_in_window = find_all_elements_with_role(window, "AXButton")
+                logger.info(f"Found {len(all_buttons_in_window)} buttons in this window")
+                
+                for btn_index, btn in enumerate(all_buttons_in_window):
+                    btn_title = get_ax_attribute_value(btn, "AXTitle") or ""
+                    enabled = get_ax_attribute_value(btn, "AXEnabled")
+                    position = get_element_position(btn)
+                    
+                    btn_info = {
+                        "window_index": window_index,
+                        "button_index": btn_index,
+                        "title": btn_title,
+                        "enabled": enabled,
+                        "position": position
+                    }
+                    result["all_buttons"].append(btn_info)
+                    
+                    logger.info(f"Button {btn_index+1}: '{btn_title}', Enabled: {enabled}, Position: {position}")
+    
+    return result

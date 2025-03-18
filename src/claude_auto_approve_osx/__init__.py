@@ -27,7 +27,7 @@ from claude_auto_approve_osx.accessibility_utils import (
     dump_application_hierarchy,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -1397,6 +1397,11 @@ def main():
         action="store_true",
         help="Dump the accessibility hierarchy for debugging",
     )
+    parser.add_argument(
+        "--check-codemcp-dialog", 
+        action="store_true",
+        help="Intensively search for the codemcp dialog and report all findings",
+    )
     args = parser.parse_args()
 
     # Initialize configuration
@@ -1422,6 +1427,40 @@ def main():
     if args.dump_accessibility:
         approver = AccessibilityAutoApprover()
         approver.debug_accessibility()
+        return
+        
+    # Special mode to check for codemcp dialog
+    if args.check_codemcp_dialog:
+        from claude_auto_approve_osx.accessibility_utils import check_for_codemcp_dialog
+        logger.info("Running intensive search for codemcp dialog...")
+        results = check_for_codemcp_dialog()
+        
+        # Create debug output
+        debug_dir = Path(__file__).parent / "debug"
+        debug_dir.mkdir(exist_ok=True)
+        
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        output_path = debug_dir / f"codemcp_dialog_search-{timestamp}.txt"
+        
+        with open(output_path, "w") as f:
+            f.write("=== CODEMCP DIALOG SEARCH RESULTS ===\n\n")
+            f.write(f"Found 'codemcp' text: {results['found_codemcp_text']}\n\n")
+            
+            f.write("=== WINDOWS ===\n")
+            for window in results["all_windows"]:
+                f.write(f"Window {window['index']}: '{window['title']}' ({window['role']})\n")
+            
+            f.write("\n=== BUTTONS ===\n")
+            for btn in results["all_buttons"]:
+                f.write(f"Button: '{btn['title']}', Enabled: {btn['enabled']}, Position: {btn['position']}\n")
+                
+            f.write("\n=== TEXT ELEMENTS ===\n")
+            for text in results["all_text"]:
+                if "codemcp" in text["value"].lower():
+                    f.write(f"*** TEXT WITH CODEMCP (Window {text['window_index']}) ***\n")
+                    f.write(f"{text['value']}\n\n")
+                    
+        logger.info(f"Detailed debug output saved to {output_path}")
         return
 
     # Choose which auto-approver to use
