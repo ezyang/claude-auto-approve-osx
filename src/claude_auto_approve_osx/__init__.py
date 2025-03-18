@@ -5,7 +5,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Tuple, Optional, Self
+from typing import Tuple, Optional, Self, Dict, Any
 
 import mss
 import pytesseract
@@ -14,6 +14,12 @@ from AppKit import NSWorkspace, NSApplicationActivateIgnoringOtherApps
 import Quartz
 import subprocess
 import pyautogui
+
+from claude_auto_approve_osx.window_focus import (
+    get_frontmost_app,
+    activate_app_by_name,
+    activate_app_by_bundle_id,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -733,6 +739,7 @@ class AutoApprover:
         template_manager: Manager for image templates used in recognition.
         window_manager: Manager for Claude window interaction.
         ocr_service: Service for optical character recognition.
+        previous_foreground_app: Stores information about the previously focused app.
     """
 
     def __init__(self) -> None:
@@ -741,6 +748,7 @@ class AutoApprover:
         self.template_manager = TemplateManager()
         self.window_manager = WindowManager()
         self.ocr_service = OCRService()
+        self.previous_foreground_app = None
 
     def is_tool_allowed(self, tool_name: str) -> bool:
         """Check if the requested tool is in the allowed list.
@@ -760,7 +768,7 @@ class AutoApprover:
 
         Uses template matching to locate the approval button, then calculates
         its screen position and simulates a click. Preserves mouse position
-        after clicking.
+        after clicking. Also preserves and restores the previously focused window.
 
         Args:
             screenshot: Image of the Claude application window.
@@ -831,16 +839,49 @@ class AutoApprover:
             logger.info(f"Button relative position: {rel_x}, {rel_y}")
             logger.info(f"Scaled relative position: {scaled_rel_x}, {scaled_rel_y}")
 
+            # Save current mouse position
             old_x, old_y = pyautogui.position()
 
-            # NOTE: Focusing code is disabled as requested
-            # self.window_manager.focus_claude_window()
+            # Save the currently focused app before switching
+            self.previous_foreground_app = get_frontmost_app()
+            if self.previous_foreground_app:
+                logger.info(
+                    f"Saving current foreground app: {self.previous_foreground_app['name']}"
+                )
 
+            # Focus Claude window to ensure click works properly
+            self.window_manager.focus_claude_window()
+            time.sleep(0.2)  # Short delay to ensure window is focused
+
+            # Click the button
             logger.info(f"Button found at {screen_x}, {screen_y}")
             pyautogui.click(screen_x, screen_y)
 
             # Restore mouse position
             pyautogui.moveTo(old_x, old_y)
+
+            # Restore the previously focused app
+            if self.previous_foreground_app:
+                logger.info(
+                    f"Restoring previous foreground app: {self.previous_foreground_app['name']}"
+                )
+                app_instance = self.previous_foreground_app.get("app_instance")
+                if app_instance:
+                    app_instance.activateWithOptions_(
+                        NSApplicationActivateIgnoringOtherApps
+                    )
+                else:
+                    # Fallback using bundle ID if app instance not available
+                    bundle_id = self.previous_foreground_app.get("bundle_id")
+                    if bundle_id:
+                        activate_app_by_bundle_id(bundle_id)
+                    else:
+                        # Last resort, try by name
+                        activate_app_by_name(
+                            self.previous_foreground_app.get("name", "")
+                        )
+                time.sleep(0.1)  # Short delay to ensure app is focused
+
             return None
         else:
             return False
@@ -867,12 +908,8 @@ class AutoApprover:
             if not claude_window_id:
                 return False, "no_window"
 
-            # NOTE: Focusing code is disabled as requested
-            # if not self.window_manager.focus_claude_window():
-            #     logger.warning("Could not focus Claude window")
-
-            # Short delay to ensure window is fully in foreground and rendered
-            # time.sleep(0.3)
+            # We'll focus Claude when clicking the button, not here
+            # This avoids unnecessarily switching focus during detection
 
             x, y, width, height = window_info
             # Pass window_id to capture method to use direct window capture without bounds
@@ -1171,7 +1208,15 @@ def main():
     """
     import argparse
 
-    parser = argparse.ArgumentParser(description="Claude Auto-Approval Tool for macOS")
+    parser = argparse.ArgumentParser(
+        description="Claude Auto-Approval Tool for macOS",
+        epilog=(
+            "This tool automatically manages window focus: when a tool request is detected, "
+            "it saves the currently active application, brings Claude to the foreground, "
+            "clicks the approval button, and restores the original application to foreground. "
+            "This allows you to continue working in other applications without disruption."
+        ),
+    )
     parser.add_argument(
         "--debug",
         action="store_true",

@@ -94,9 +94,17 @@ Edit the `Config` class in `claude_auto_approve.py` to customize:
 - **Button not being clicked**: You may need to update the template images to match your current Claude UI version
 - **Occluded/overlapped windows**: Make sure Claude is not covered by other windows. Due to macOS security limitations, the script can only capture what's visible on screen. The script attempts to bring Claude to the foreground, but it's best to keep it unobstructed.
 
-## macOS Limitations
+## Window Management
 
-Button click doesn't work unless Claude Desktop is in foreground.
+The tool includes smart window focus management:
+
+1. When a tool request is detected, the tool will:
+   - Save the currently active application 
+   - Bring Claude to the foreground
+   - Click the approval button
+   - Restore the original application to the foreground
+
+This allows the tool to run in the background without disrupting your workflow. You can continue working in other applications while the tool automatically handles Claude approvals.
 
 ## Security Considerations
 
