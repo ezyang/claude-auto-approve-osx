@@ -626,10 +626,10 @@ def check_for_codemcp_dialog():
             }
             result["all_text"].append(text_info)
             
-            # Check for "codemcp" in the text
-            if "codemcp" in text_value.lower():
-                result["found_codemcp_text"] = True
-                logger.info(f"Found text with 'codemcp' in window {window_index+1}")
+            # Check for tool-related text
+            if any(keyword in text_value.lower() for keyword in ["run", "tool", "claude wants to"]):
+                result["found_tool_dialog_text"] = True
+                logger.info(f"Found text related to tool use in window {window_index+1}")
                 logger.info(f"Text content: {text_value[:200]}...")
                 
                 # Find parent dialog/group

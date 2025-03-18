@@ -42,7 +42,7 @@ claude-auto-approve-osx
 The tool will:
 1. Monitor for the Claude application window
 2. Search for "Allow for This Chat" button using Accessibility APIs
-3. If found, automatically click the approval button
+3. If found, automatically click the approval button for any tool use
 4. Restore focus to your previously active application
 
 Press Ctrl+C to stop the tool.
@@ -68,9 +68,9 @@ You can also specify a specific application name:
 claude-auto-approve-osx --app-name="Your Claude App Name" --debug
 ```
 
-If you're specifically debugging issues with the codemcp tool dialog:
+If you're specifically debugging issues with tool approval dialogs:
 ```
-claude-auto-approve-osx --check-codemcp-dialog
+claude-auto-approve-osx --check-tool-dialogs
 ```
 
 Debugging works well with [codemcp](https://github.com/ezyang/codemcp), which is how this port was developed and debugged.
@@ -80,7 +80,7 @@ Debugging works well with [codemcp](https://github.com/ezyang/codemcp), which is
 - `--debug`: Run in debug mode (dump accessibility hierarchy and exit)
 - `--app-name`: Specify the Claude application name to look for
 - `--dump-accessibility`: Dump the accessibility hierarchy for debugging
-- `--check-codemcp-dialog`: Intensively search for the codemcp dialog and report all findings
+- `--check-tool-dialogs`: Intensively search for any tool approval dialogs and report all findings
 
 ## Configuration
 
@@ -102,7 +102,7 @@ To modify the allowed tools or other settings, edit the `Config` class in the so
 - **Script can't find Claude window**: Try setting `--app-name` to the correct value
 - **Button not being found**: Use `--dump-accessibility` to inspect the accessibility hierarchy
 - **Permission issues**: Make sure to grant accessibility permissions to Terminal (or your Python environment app) in System Preferences > Security & Privacy > Privacy > Accessibility
-- **Issues with codemcp dialog**: Use the `--check-codemcp-dialog` option to debug specifically for codemcp
+- **Issues with tool approval dialogs**: Use the `--check-tool-dialogs` option to debug tool approval dialogs
 
 ## Window Management
 

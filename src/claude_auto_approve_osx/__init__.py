@@ -77,7 +77,6 @@ class Config:
             "Is",
             "google_search",
             "read-file",
-            "codemep",
             "codemcp",
         ]
         self.tool_pattern = re.compile(r"Run\s+(\S+)\s+from\s+(\S+)")
@@ -267,9 +266,15 @@ def main():
         help="Dump the accessibility hierarchy for debugging",
     )
     parser.add_argument(
+        "--check-tool-dialogs",
+        action="store_true",
+        help="Intensively search for any tool approval dialogs and report all findings",
+    )
+    # For backward compatibility
+    parser.add_argument(
         "--check-codemcp-dialog",
         action="store_true",
-        help="Intensively search for the codemcp dialog and report all findings",
+        help=argparse.SUPPRESS,
     )
     args = parser.parse_args()
 
@@ -288,22 +293,22 @@ def main():
         approver.debug_accessibility()
         return
 
-    # Special mode to check for codemcp dialog
-    if args.check_codemcp_dialog:
-        from claude_auto_approve_osx.accessibility_utils import check_for_codemcp_dialog
-        logger.info("Running intensive search for codemcp dialog...")
-        results = check_for_codemcp_dialog()
+    # Special mode to check for tool dialogs
+    if args.check_codemcp_dialog or args.check_tool_dialogs:
+        from claude_auto_approve_osx.accessibility_utils import check_for_tool_dialogs
+        logger.info("Running intensive search for tool approval dialogs...")
+        results = check_for_tool_dialogs()
 
         # Create debug output
         debug_dir = Path(__file__).parent / "debug"
         debug_dir.mkdir(exist_ok=True)
 
         timestamp = time.strftime("%Y%m%d-%H%M%S")
-        output_path = debug_dir / f"codemcp_dialog_search-{timestamp}.txt"
+        output_path = debug_dir / f"tool_dialog_search-{timestamp}.txt"
 
         with open(output_path, "w") as f:
-            f.write("=== CODEMCP DIALOG SEARCH RESULTS ===\n\n")
-            f.write(f"Found 'codemcp' text: {results['found_codemcp_text']}\n\n")
+            f.write("=== TOOL DIALOG SEARCH RESULTS ===\n\n")
+            f.write(f"Found tool dialog text: {results['found_tool_dialog_text']}\n\n")
 
             f.write("=== WINDOWS ===\n")
             for window in results["all_windows"]:
