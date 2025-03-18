@@ -1,15 +1,14 @@
 # Claude Auto Approval Tool for macOS
 
-This tool automatically approves selected tool requests in the Claude desktop application on macOS. It uses macOS Accessibility APIs to detect and interact with approval dialogs, with a fallback to computer vision and OCR if needed.
+This tool automatically approves selected tool requests in the Claude desktop application on macOS. It uses macOS Accessibility APIs to detect and interact with approval dialogs.
 
 This is an OSX port of @Richard-Weiss's Windows auto-approver https://gist.github.com/Richard-Weiss/1ecfee909d839367001199ad179fad28
 
 ## Prerequisites
 
 - macOS
-- Python 3.8+
+- Python 3.12+
 - Claude desktop application installed
-- Tesseract OCR
 
 ## Setup
 
@@ -19,107 +18,91 @@ git clone https://github.com/ezyang/claude-auto-approve-osx
 cd claude-auto-approve-osx
 ```
 
-2. Install Tesseract OCR using Homebrew:
+2. Install the package using pip:
 ```
-brew install tesseract
+pip install .
 ```
 
-3. Run
+Or with uv:
 ```
-uv run claude-auto-approve-osx
+uv pip install .
 ```
+
+3. You need to grant Accessibility permissions to Terminal (or your Python environment app) in System Preferences > Security & Privacy > Privacy > Accessibility.
 
 ## Usage
 
 ### Basic Usage
 
-Run the script:
+Run the tool:
 ```
-python claude_auto_approve.py
+claude-auto-approve-osx
 ```
 
-The script will:
+The tool will:
 1. Monitor for the Claude application window
 2. Search for "Allow for This Chat" button using Accessibility APIs
 3. If found, automatically click the approval button
 4. Restore focus to your previously active application
 
-Press Ctrl+C to stop the script.
-
-### Method Options
-
-By default, the tool uses macOS Accessibility APIs, which are more reliable and work even when windows are partially occluded. If you prefer the original screenshot-based approach:
-
-```
-python claude_auto_approve.py --use-screenshot
-```
+Press Ctrl+C to stop the tool.
 
 ### Debugging Options
 
-If you're having trouble getting the script to detect Claude's window properly, use these debugging options:
-
-List all visible windows on your screen:
-```
-python claude_auto_approve.py --list-windows
-```
+If you're having trouble getting the tool to detect Claude's window properly, use these debugging options:
 
 Dump the accessibility hierarchy for debugging:
 ```
-python claude_auto_approve.py --dump-accessibility
+claude-auto-approve-osx --dump-accessibility
 ```
 
 Run in debug mode:
 ```
-python claude_auto_approve.py --debug
+claude-auto-approve-osx --debug
 ```
 
-This will:
-1. If using accessibility mode (default): Dump the accessibility hierarchy
-2. If using screenshot mode: Capture a screenshot and generate an HTML report
+This will dump the accessibility hierarchy and exit.
 
 You can also specify a specific application name:
 ```
-python claude_auto_approve.py --app-name="Your Claude App Name" --debug
+claude-auto-approve-osx --app-name="Your Claude App Name" --debug
 ```
 
-Debugging works pretty well with [codemcp](https://github.com/ezyang/codemcp),
-which is how I made this port and debugged problems with it.
+If you're specifically debugging issues with the codemcp tool dialog:
+```
+claude-auto-approve-osx --check-codemcp-dialog
+```
+
+Debugging works well with [codemcp](https://github.com/ezyang/codemcp), which is how this port was developed and debugged.
 
 ### Command Line Options
 
-- `--debug`: Run in debug mode (dump debug info and exit)
+- `--debug`: Run in debug mode (dump accessibility hierarchy and exit)
 - `--app-name`: Specify the Claude application name to look for
-- `--list-windows`: List all visible windows on screen and exit
-- `--use-screenshot`: Use the screenshot-based approach instead of accessibility APIs
 - `--dump-accessibility`: Dump the accessibility hierarchy for debugging
-- `--confidence`: Set the button template matching confidence threshold (0.0-1.0) - only for screenshot mode
-- `--dialog-confidence`: Set the dialog template matching confidence threshold (0.0-1.0) - only for screenshot mode
+- `--check-codemcp-dialog`: Intensively search for the codemcp dialog and report all findings
 
 ## Configuration
 
-Edit the `Config` class in `claude_auto_approve.py` to customize:
-- Allowed tools list
-- Detection confidence thresholds
-- Polling intervals
-- Path to template images
-- Claude application name
+The tool is configured to automatically approve the following tools:
+- list-allowed-directories
+- list-denied-directories
+- ls
+- Is
+- google_search
+- read-file
+- codemcp
+
+To modify the allowed tools or other settings, edit the `Config` class in the source code.
 
 ## Troubleshooting
 
-### Accessibility API Mode (Default)
+### Common Issues
 
-- **Script can't find Claude window**: Use `--list-windows` to see all visible windows and try setting `--app-name` to the correct value
-- **Button not being found**: Use `--dump-accessibility` to inspect the accessibility hierarchy and understand the structure
+- **Script can't find Claude window**: Try setting `--app-name` to the correct value
+- **Button not being found**: Use `--dump-accessibility` to inspect the accessibility hierarchy
 - **Permission issues**: Make sure to grant accessibility permissions to Terminal (or your Python environment app) in System Preferences > Security & Privacy > Privacy > Accessibility
-- **Incorrect button presses**: The tool is designed to identify and press only "Allow"-type buttons, but if you experience issues, you can switch to screenshot mode with `--use-screenshot`
-
-### Screenshot Mode
-
-- **Script can't find Claude window**: Use `--list-windows` to see all visible windows and try setting `--app-name` to the correct value
-- **Script captures wrong/small window**: Create a debug report (`--debug`) to see which window is being captured
-- **OCR not working**: Verify Tesseract is installed correctly
-- **Button not being clicked**: You may need to update the template images to match your current Claude UI version
-- **Occluded/overlapped windows**: Make sure Claude is not covered by other windows. Due to macOS security limitations, the script can only capture what's visible on screen in this mode.
+- **Issues with codemcp dialog**: Use the `--check-codemcp-dialog` option to debug specifically for codemcp
 
 ## Window Management
 
@@ -127,13 +110,10 @@ The tool includes smart window focus management:
 
 1. When a tool request is detected, the tool will:
    - Save the currently active application
-   - If necessary, bring Claude to the foreground (depending on the mode)
-   - Click or press the approval button
+   - Interact with the approval button using Accessibility APIs
    - Restore the original application to the foreground
 
 This allows the tool to run in the background without disrupting your workflow. You can continue working in other applications while the tool automatically handles Claude approvals.
-
-The accessibility mode is generally less intrusive as it often doesn't need to bring Claude to the foreground to interact with buttons.
 
 ## Security Considerations
 
