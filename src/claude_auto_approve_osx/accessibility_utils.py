@@ -468,7 +468,7 @@ def find_allow_button_in_claude():
                         for btn in all_buttons:
                             title = get_ax_attribute_value(btn, "AXTitle")
                             all_discovered_buttons.append(title)
-                            if title and "don't" not in title.lower() and "cancel" not in title.lower():
+                            if title == "Allow for This Chat":
                                 logger.info(f"✓ Found approval button with title: '{title}'")
                                 return btn
                 
