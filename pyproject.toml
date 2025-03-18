@@ -15,6 +15,11 @@ dependencies = [
     "pytesseract>=0.3.8",
 ]
 
+[dependency-groups]
+dev = [
+    "ruff>=0.1.5",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -5,18 +5,17 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Tuple, Optional, List, Self
+from typing import Tuple, Optional, Self
 
 import mss
 import pytesseract
 from PIL import Image, ImageEnhance
-from Foundation import NSRect
 from AppKit import NSWorkspace, NSApplicationActivateIgnoringOtherApps
 import Quartz
 import subprocess
 import pyautogui
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -46,6 +45,7 @@ class Config:
         debug_mode: Whether to run in debug mode (capture single screenshot and exit)
         debug_dir: Directory to save debug screenshots and info
     """
+
     _instance = None
 
     def __new__(cls):
@@ -68,7 +68,7 @@ class Config:
         self.button_image = str(self.script_dir / "approve_button.png")
         self.dialog_template_paths = [
             str(self.script_dir / "dialog_template.png"),
-            str(self.script_dir / "dialog_template_expanded.png")
+            str(self.script_dir / "dialog_template_expanded.png"),
         ]
 
         self.claude_app_name = "Claude"
@@ -93,7 +93,7 @@ class Config:
         self.no_image_delay = 1.0
         self.blocked_tool_delay = 3.0
         self.cache_timeout = 30
-        
+
         # Debug mode settings
         self.debug_mode = False
         self.debug_dir = self.script_dir / "debug"
@@ -111,6 +111,7 @@ class TemplateManager:
         approve_button_template (Image): The loaded image template for the approval button.
         dialog_templates (List[Image]): The loaded image templates for the dialog boxes.
     """
+
     _instance = None
     _initialized = False
 
@@ -144,8 +145,12 @@ class TemplateManager:
         """
         config = Config()
         self.approve_button_template = Image.open(config.button_image)
-        self.dialog_templates = [Image.open(path) for path in config.dialog_template_paths]
-        logger.info(f"Template images loaded: 1 button, {len(self.dialog_templates)} dialog variants")
+        self.dialog_templates = [
+            Image.open(path) for path in config.dialog_template_paths
+        ]
+        logger.info(
+            f"Template images loaded: 1 button, {len(self.dialog_templates)} dialog variants"
+        )
 
 
 class WindowManager:
@@ -162,6 +167,7 @@ class WindowManager:
         last_check_time: Timestamp of the last window handle check.
         config: Reference to the application configuration.
     """
+
     _instance = None
 
     def __init__(self) -> None:
@@ -192,7 +198,9 @@ class WindowManager:
         """
         self.config = Config()
 
-    def get_claude_window_with_cache(self) -> Tuple[Optional[int], Optional[Tuple[int, int, int, int]]]:
+    def get_claude_window_with_cache(
+        self,
+    ) -> Tuple[Optional[int], Optional[Tuple[int, int, int, int]]]:
         """Get the Claude window handle and information with caching.
 
         Caches window information for performance and only refreshes when
@@ -210,7 +218,10 @@ class WindowManager:
         # self.focus_claude_app()
         # time.sleep(0.2)  # Short delay to let window manager respond
 
-        if self.cached_window_id is None or current_time - self.last_check_time > self.config.cache_timeout:
+        if (
+            self.cached_window_id is None
+            or current_time - self.last_check_time > self.config.cache_timeout
+        ):
             self.cached_window_id = self.get_claude_window_id()
             if self.cached_window_id:
                 self.cached_window_info = self.get_window_info(self.cached_window_id)
@@ -231,53 +242,72 @@ class WindowManager:
         """
         # Get all windows
         windows = Quartz.CGWindowListCopyWindowInfo(
-            Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
-            Quartz.kCGNullWindowID
+            Quartz.kCGWindowListOptionOnScreenOnly
+            | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID,
         )
-        
+
         # Print all window information for debugging
         logger.info(f"Found {len(windows)} windows on screen")
-        
+
         claude_windows = []
-        
+
         for window in windows:
-            app_name = window.get('kCGWindowOwnerName', '')
-            window_title = window.get('kCGWindowName', '')
-            window_id = window.get('kCGWindowNumber')
-            window_bounds = window.get('kCGWindowBounds', {})
-            window_layer = window.get('kCGWindowLayer', -1)
-            
+            app_name = window.get("kCGWindowOwnerName", "")
+            window_title = window.get("kCGWindowName", "")
+            window_id = window.get("kCGWindowNumber")
+            window_bounds = window.get("kCGWindowBounds", {})
+            window_layer = window.get("kCGWindowLayer", -1)
+
             # Convert bounds to string for logging
-            bounds_str = f"{window_bounds.get('X', '?')},{window_bounds.get('Y', '?')}" \
-                         f" {window_bounds.get('Width', '?')}x{window_bounds.get('Height', '?')}"
-            
+            bounds_str = (
+                f"{window_bounds.get('X', '?')},{window_bounds.get('Y', '?')}"
+                f" {window_bounds.get('Width', '?')}x{window_bounds.get('Height', '?')}"
+            )
+
             # Log all windows for debugging
-            logger.info(f"Window: '{app_name}' - '{window_title}' (ID: {window_id}, Layer: {window_layer}, Bounds: {bounds_str})")
-            
+            logger.info(
+                f"Window: '{app_name}' - '{window_title}' (ID: {window_id}, Layer: {window_layer}, Bounds: {bounds_str})"
+            )
+
             # Collect all windows that might be Claude
-            if app_name.lower() == self.config.claude_app_name.lower() or "claude" in app_name.lower():
-                claude_windows.append({
-                    'app_name': app_name,
-                    'title': window_title,
-                    'id': window_id,
-                    'bounds': bounds_str,
-                    'layer': window_layer,
-                    'raw_bounds': window_bounds
-                })
+            if (
+                app_name.lower() == self.config.claude_app_name.lower()
+                or "claude" in app_name.lower()
+            ):
+                claude_windows.append(
+                    {
+                        "app_name": app_name,
+                        "title": window_title,
+                        "id": window_id,
+                        "bounds": bounds_str,
+                        "layer": window_layer,
+                        "raw_bounds": window_bounds,
+                    }
+                )
 
         if claude_windows:
             # Sort by layer and size (prefer topmost window and larger windows)
-            sorted_windows = sorted(claude_windows, 
-                                    key=lambda w: (w['layer'], 
-                                                   -(w['raw_bounds'].get('Width', 0) * w['raw_bounds'].get('Height', 0))))
-            
-            logger.info(f"Found {len(claude_windows)} Claude windows, selecting: " +
-                       f"'{sorted_windows[0]['app_name']}' - '{sorted_windows[0]['title']}' " +
-                       f"(ID: {sorted_windows[0]['id']}, Layer: {sorted_windows[0]['layer']}, " +
-                       f"Bounds: {sorted_windows[0]['bounds']})")
-            
-            return sorted_windows[0]['id']
-        
+            sorted_windows = sorted(
+                claude_windows,
+                key=lambda w: (
+                    w["layer"],
+                    -(
+                        w["raw_bounds"].get("Width", 0)
+                        * w["raw_bounds"].get("Height", 0)
+                    ),
+                ),
+            )
+
+            logger.info(
+                f"Found {len(claude_windows)} Claude windows, selecting: "
+                + f"'{sorted_windows[0]['app_name']}' - '{sorted_windows[0]['title']}' "
+                + f"(ID: {sorted_windows[0]['id']}, Layer: {sorted_windows[0]['layer']}, "
+                + f"Bounds: {sorted_windows[0]['bounds']})"
+            )
+
+            return sorted_windows[0]["id"]
+
         logger.info("No Claude windows found")
         return None
 
@@ -291,24 +321,27 @@ class WindowManager:
             Tuple[int, int, int, int]: Window position and size as (x, y, width, height).
         """
         windows = Quartz.CGWindowListCopyWindowInfo(
-            Quartz.kCGWindowListOptionIncludingWindow,
-            window_id
+            Quartz.kCGWindowListOptionIncludingWindow, window_id
         )
-        
+
         if windows and len(windows) == 1:
-            window_bounds = windows[0].get('kCGWindowBounds')
-            x = window_bounds.get('X', 0)
-            y = window_bounds.get('Y', 0)
-            width = window_bounds.get('Width', 0)
-            height = window_bounds.get('Height', 0)
-            logger.info(f"Found window with size: {width}x{height} at position: {x},{y}")
+            window_bounds = windows[0].get("kCGWindowBounds")
+            x = window_bounds.get("X", 0)
+            y = window_bounds.get("Y", 0)
+            width = window_bounds.get("Width", 0)
+            height = window_bounds.get("Height", 0)
+            logger.info(
+                f"Found window with size: {width}x{height} at position: {x},{y}"
+            )
             return x, y, width, height
-        
+
         # Return zeros if window not found
         logger.warning("Window not found or has invalid dimensions")
         return 0, 0, 0, 0
 
-    def capture_window_screenshot(self, x: int, y: int, width: int, height: int, window_id: Optional[int] = None) -> Image.Image:
+    def capture_window_screenshot(
+        self, x: int, y: int, width: int, height: int, window_id: Optional[int] = None
+    ) -> Image.Image:
         """Capture a screenshot of a window, even if it's obscured by other windows.
 
         Args:
@@ -326,24 +359,29 @@ class WindowManager:
         # that can capture obscured windows
         if window_id is not None:
             try:
-                logger.info(f"Attempting to capture window {window_id} directly using CGWindowListCreateImage")
-                
+                logger.info(
+                    f"Attempting to capture window {window_id} directly using CGWindowListCreateImage"
+                )
+
                 # Instead of using the provided x,y coordinates, capture the entire window
                 # using CGRectNull which will get the full window bounds automatically
                 window_image = Quartz.CGWindowListCreateImage(
                     Quartz.CGRectNull,  # Use null rectangle to get the whole window
                     Quartz.kCGWindowListOptionIncludingWindow,  # Only include the specified window
                     window_id,  # The specific window to capture
-                    Quartz.kCGWindowImageBoundsIgnoreFraming | Quartz.kCGWindowImageShouldBeOpaque
+                    Quartz.kCGWindowImageBoundsIgnoreFraming
+                    | Quartz.kCGWindowImageShouldBeOpaque,
                 )
-                
+
                 if window_image:
                     # Convert the CGImage to a PIL Image
                     width = Quartz.CGImageGetWidth(window_image)
                     height = Quartz.CGImageGetHeight(window_image)
-                    
-                    logger.info(f"Captured window directly using Quartz: {width}x{height}")
-                    
+
+                    logger.info(
+                        f"Captured window directly using Quartz: {width}x{height}"
+                    )
+
                     # Create a bitmap context and draw the image
                     color_space = Quartz.CGColorSpaceCreateDeviceRGB()
                     context = Quartz.CGBitmapContextCreate(
@@ -353,75 +391,84 @@ class WindowManager:
                         8,  # bits per component
                         width * 4,  # bytes per row (4 bytes per pixel: RGBA)
                         color_space,
-                        Quartz.kCGImageAlphaPremultipliedLast
+                        Quartz.kCGImageAlphaPremultipliedLast,
                     )
-                    
+
                     # Draw the image in the context
                     rect = Quartz.CGRectMake(0, 0, width, height)
                     Quartz.CGContextDrawImage(context, rect, window_image)
-                    
+
                     # Get the image from the context
                     image_ref = Quartz.CGBitmapContextCreateImage(context)
-                    
+
                     # Convert to PIL Image
                     provider = Quartz.CGImageGetDataProvider(image_ref)
                     data = Quartz.CGDataProviderCopyData(provider)
                     buffer = bytes(data)
-                    
+
                     # Create a PIL Image from the raw data - BGRA is how macOS stores it
-                    pil_image = Image.frombuffer("RGBA", (width, height), buffer, "raw", "BGRA", 0, 1)
-                    
+                    pil_image = Image.frombuffer(
+                        "RGBA", (width, height), buffer, "raw", "BGRA", 0, 1
+                    )
+
                     return pil_image
             except Exception as e:
                 logger.error(f"Error capturing window using Quartz: {e}")
                 logger.warning("Falling back to screen region capture")
-                
+
         # Fall back to the MSS screen capture method (can't capture obscured windows)
-        logger.info(f"Using MSS to capture screen region at {x},{y} with size {width}x{height}")
+        logger.info(
+            f"Using MSS to capture screen region at {x},{y} with size {width}x{height}"
+        )
         with mss.mss() as sct:
             monitor = {"top": y, "left": x, "width": width, "height": height}
             screenshot = sct.grab(monitor)
-            image = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+            image = Image.frombytes(
+                "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX"
+            )
             return image
-    
+
     def list_all_windows(self) -> None:
         """List all visible windows on the screen with detailed information.
-        
+
         This is useful for debugging to find the correct window to target.
         """
         print("\n==== All Visible Windows ====\n")
-        
+
         windows = Quartz.CGWindowListCopyWindowInfo(
-            Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
-            Quartz.kCGNullWindowID
+            Quartz.kCGWindowListOptionOnScreenOnly
+            | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID,
         )
-        
+
         print(f"Found {len(windows)} windows on screen\n")
-        
+
         # Group windows by application
         apps = {}
         for window in windows:
-            app_name = window.get('kCGWindowOwnerName', 'Unknown')
+            app_name = window.get("kCGWindowOwnerName", "Unknown")
             if app_name not in apps:
                 apps[app_name] = []
             apps[app_name].append(window)
-        
+
         # Print window information grouped by app
         for app_name, app_windows in sorted(apps.items()):
             print(f"\n== Application: {app_name} ({len(app_windows)} windows) ==")
-            
+
             for window in app_windows:
-                window_title = window.get('kCGWindowName', '')
-                window_id = window.get('kCGWindowNumber')
-                window_bounds = window.get('kCGWindowBounds', {})
-                window_layer = window.get('kCGWindowLayer', -1)
-                window_alpha = window.get('kCGWindowAlpha', 1.0)
-                window_memory = window.get('kCGWindowMemoryUsage', 0)
-                
+                window_title = window.get("kCGWindowName", "")
+                window_id = window.get("kCGWindowNumber")
+                window_bounds = window.get("kCGWindowBounds", {})
+                window_layer = window.get("kCGWindowLayer", -1)
+                window_alpha = window.get("kCGWindowAlpha", 1.0)
+                window_memory = window.get("kCGWindowMemoryUsage", 0)
+
                 # Convert bounds to string for logging
-                bounds_str = f"{window_bounds.get('X', '?')},{window_bounds.get('Y', '?')}" \
-                             f" {window_bounds.get('Width', '?')}x{window_bounds.get('Height', '?')}"
-                
+                bounds_str = (
+                    f"{window_bounds.get('X', '?')},{window_bounds.get('Y', '?')}"
+                    f" {window_bounds.get('Width', '?')}x{window_bounds.get('Height', '?')}"
+                )
+
                 print(f"  Window: '{window_title}'")
                 print(f"    ID: {window_id}")
                 print(f"    Layer: {window_layer} (lower = closer to front)")
@@ -429,61 +476,71 @@ class WindowManager:
                 print(f"    Alpha: {window_alpha}")
                 print(f"    Memory: {window_memory}")
                 print(f"    Is key window: {window.get('kCGWindowIsOnscreen', False)}")
-                print(f"    Backing store type: {window.get('kCGWindowSharingState', 'Unknown')}")
+                print(
+                    f"    Backing store type: {window.get('kCGWindowSharingState', 'Unknown')}"
+                )
                 print("")
-        
-        print("\nTIP: Use --app-name=\"App Name\" to target a specific application")
+
+        print('\nTIP: Use --app-name="App Name" to target a specific application')
         print("     Use --debug to capture a screenshot of the detected window")
         print("     Here are some potential commands to try:\n")
-        
+
         # Suggest commands for likely Claude-related windows
         for app_name in apps.keys():
             if "claude" in app_name.lower() or "anthropic" in app_name.lower():
-                print(f"     python claude_auto_approve.py --app-name=\"{app_name}\" --debug")
-    
+                print(
+                    f'     python claude_auto_approve.py --app-name="{app_name}" --debug'
+                )
+
     def focus_claude_app(self):
         """Attempts to focus the Claude application by name.
-        
+
         This is different from focus_claude_window as it focuses the application
         itself rather than a specific window. This is useful before window detection.
-        
+
         Returns:
             bool: True if Claude app was found and activated, False otherwise.
         """
         apps = NSWorkspace.sharedWorkspace().runningApplications()
-        
+
         # Try exact match first
         for app in apps:
             if app.localizedName() == self.config.claude_app_name:
                 logger.info(f"Focusing {self.config.claude_app_name} application")
                 app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
                 return True
-        
+
         # If exact match fails, try case-insensitive match or contains
         for app in apps:
             if self.config.claude_app_name.lower() in app.localizedName().lower():
-                logger.info(f"Focusing app with name containing '{self.config.claude_app_name}': {app.localizedName()}")
+                logger.info(
+                    f"Focusing app with name containing '{self.config.claude_app_name}': {app.localizedName()}"
+                )
                 app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
                 return True
-                
+
         # Try with common Claude-related names as fallback
         common_names = ["Claude", "Anthropic", "Claude AI"]
         for name in common_names:
             if name == self.config.claude_app_name:
                 continue  # Skip if it's the same as the already tried name
-                
+
             for app in apps:
                 if name.lower() in app.localizedName().lower():
-                    logger.info(f"Focusing app with common Claude name '{name}': {app.localizedName()}")
+                    logger.info(
+                        f"Focusing app with common Claude name '{name}': {app.localizedName()}"
+                    )
                     app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
                     return True
-        
-        logger.warning(f"Could not find Claude application to focus. Checked for: {self.config.claude_app_name} and common names")
+
+        logger.warning(
+            f"Could not find Claude application to focus. Checked for: {self.config.claude_app_name} and common names"
+        )
         return False
-    
+
     def focus_claude_window(self):
         """Brings the Claude application window to the foreground.
-        
+
         Returns:
             bool: True if Claude was found and activated, False otherwise.
         """
@@ -493,8 +550,10 @@ class WindowManager:
                 app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
                 logger.info(f"Focused {self.config.claude_app_name} application")
                 return True
-                
-        logger.warning(f"Could not find {self.config.claude_app_name} application to focus")
+
+        logger.warning(
+            f"Could not find {self.config.claude_app_name} application to focus"
+        )
         return False
 
 
@@ -512,6 +571,7 @@ class OCRService:
         is_configured: Boolean indicating if Tesseract OCR is properly configured.
         config: Reference to the application configuration.
     """
+
     _instance = None
     _initialized = False
 
@@ -564,11 +624,11 @@ class OCRService:
 
         # Common macOS paths for Tesseract
         paths_to_try = [
-            '/usr/local/bin/tesseract',
-            '/opt/homebrew/bin/tesseract',
-            '/opt/local/bin/tesseract'
+            "/usr/local/bin/tesseract",
+            "/opt/homebrew/bin/tesseract",
+            "/opt/local/bin/tesseract",
         ]
-        
+
         for path in paths_to_try:
             if os.path.isfile(path):
                 try:
@@ -578,14 +638,15 @@ class OCRService:
                     logger.info(f"Tesseract OCR configured successfully using {path}")
                     return True
                 except Exception as e:
-                    logger.debug(f"Tesseract configuration failed with path {path}: {e}")
+                    logger.debug(
+                        f"Tesseract configuration failed with path {path}: {e}"
+                    )
 
         # Try using 'which' command to find tesseract
         try:
-            result = subprocess.run(['which', 'tesseract'], 
-                                    capture_output=True, 
-                                    text=True, 
-                                    check=True)
+            result = subprocess.run(
+                ["which", "tesseract"], capture_output=True, text=True, check=True
+            )
             path = result.stdout.strip()
             if path:
                 pytesseract.pytesseract.tesseract_cmd = path
@@ -596,10 +657,14 @@ class OCRService:
         except Exception as e:
             logger.debug(f"Failed to find tesseract using 'which': {e}")
 
-        logger.error("Tesseract OCR configuration failed. Please install it with 'brew install tesseract'")
+        logger.error(
+            "Tesseract OCR configuration failed. Please install it with 'brew install tesseract'"
+        )
         return False
 
-    def extract_tool_info(self, screenshot: Image.Image, roi=None) -> Tuple[Optional[str], Optional[str]]:
+    def extract_tool_info(
+        self, screenshot: Image.Image, roi=None
+    ) -> Tuple[Optional[str], Optional[str]]:
         """Extract tool and server name using Tesseract OCR.
 
         Processes a screenshot image to extract the tool name and server name
@@ -630,8 +695,11 @@ class OCRService:
                 if w * h > 1000000:
                     scale = 0.75
                     cropped_img = cropped_img.resize(
-                        (int(cropped_img.width * scale),
-                        int(cropped_img.height * scale)))
+                        (
+                            int(cropped_img.width * scale),
+                            int(cropped_img.height * scale),
+                        )
+                    )
             else:
                 cropped_img = screenshot
 
@@ -686,10 +754,8 @@ class AutoApprover:
         return tool_name in self.config.allowed_tools
 
     def find_and_click_button(
-            self,
-            screenshot: Image.Image,
-            window_x: int,
-            window_y: int) -> Optional[bool]:
+        self, screenshot: Image.Image, window_x: int, window_y: int
+    ) -> Optional[bool]:
         """Find an approval button in a screenshot and click it.
 
         Uses template matching to locate the approval button, then calculates
@@ -707,43 +773,54 @@ class AutoApprover:
         """
         # Log sizes for debugging
         button_template = self.template_manager.approve_button_template
-        logger.info(f"Button template size: {button_template.width}x{button_template.height}")
+        logger.info(
+            f"Button template size: {button_template.width}x{button_template.height}"
+        )
         logger.info(f"Screenshot size: {screenshot.width}x{screenshot.height}")
 
         # Check template size
-        if button_template.width > screenshot.width or button_template.height > screenshot.height:
-            logger.error(f"Button template size ({button_template.width}x{button_template.height}) "
-                        f"is larger than screenshot ({screenshot.width}x{screenshot.height})")
+        if (
+            button_template.width > screenshot.width
+            or button_template.height > screenshot.height
+        ):
+            logger.error(
+                f"Button template size ({button_template.width}x{button_template.height}) "
+                f"is larger than screenshot ({screenshot.width}x{screenshot.height})"
+            )
             return False
 
         try:
             button_location = pyautogui.locate(
-                button_template,
-                screenshot,
-                confidence=self.config.confidence_threshold
+                button_template, screenshot, confidence=self.config.confidence_threshold
             )
         except Exception as e:
             logger.error(f"Error locating button: {e}")
             return False
 
         if button_location:
-            button_tuple = (button_location.left, button_location.top,
-                            button_location.width, button_location.height)
+            button_tuple = (
+                button_location.left,
+                button_location.top,
+                button_location.width,
+                button_location.height,
+            )
             rel_x, rel_y = pyautogui.center(button_tuple)
-            
+
             # Get window size information from the raw window bounds
-            window_info = self.window_manager.get_window_info(self.window_manager.cached_window_id)
+            window_info = self.window_manager.get_window_info(
+                self.window_manager.cached_window_id
+            )
             _, _, window_width, window_height = window_info
-            
+
             # Calculate the scaling factor for Retina displays
             # by comparing screenshot dimensions with window dimensions
             scale_x = screenshot.width / window_width
             scale_y = screenshot.height / window_height
-            
+
             # Apply the scaling factor to the relative coordinates
             scaled_rel_x = rel_x / scale_x
             scaled_rel_y = rel_y / scale_y
-            
+
             # Calculate the final screen position
             screen_x, screen_y = window_x + scaled_rel_x, window_y + scaled_rel_y
 
@@ -783,39 +860,48 @@ class AutoApprover:
                   Possible values: "no_window", "not_allowed", "image_not_found", "error"
         """
         try:
-            claude_window_id, window_info = self.window_manager.get_claude_window_with_cache()
+            claude_window_id, window_info = (
+                self.window_manager.get_claude_window_with_cache()
+            )
 
             if not claude_window_id:
                 return False, "no_window"
-            
+
             # NOTE: Focusing code is disabled as requested
             # if not self.window_manager.focus_claude_window():
             #     logger.warning("Could not focus Claude window")
-            
+
             # Short delay to ensure window is fully in foreground and rendered
             # time.sleep(0.3)
 
             x, y, width, height = window_info
             # Pass window_id to capture method to use direct window capture without bounds
             # This should capture the entire window content regardless of occlusion
-            screenshot = self.window_manager.capture_window_screenshot(0, 0, 0, 0, claude_window_id)
+            screenshot = self.window_manager.capture_window_screenshot(
+                0, 0, 0, 0, claude_window_id
+            )
             dialog_found = False
 
             for idx, template in enumerate(self.template_manager.dialog_templates):
                 # Check if template is smaller than screenshot
-                if template.width > screenshot.width or template.height > screenshot.height:
-                    logger.warning(f"Template {idx+1} size ({template.width}x{template.height}) is larger than screenshot ({screenshot.width}x{screenshot.height})")
+                if (
+                    template.width > screenshot.width
+                    or template.height > screenshot.height
+                ):
+                    logger.warning(
+                        f"Template {idx + 1} size ({template.width}x{template.height}) is larger than screenshot ({screenshot.width}x{screenshot.height})"
+                    )
                     continue
-                
+
                 try:
                     dialog_location = pyautogui.locate(
                         template,
                         screenshot,
                         confidence=self.config.dialog_confidence,
-                        grayscale=True
+                        grayscale=True,
                     )
                 except Exception as e:
-                    logger.error(f"Error locating dialog with template {idx+1}: {e}")
+                    logger.error(f"Error locating dialog with template {idx + 1}: {e}")
                     continue
 
                 if dialog_location:
@@ -826,28 +912,50 @@ class AutoApprover:
                     padding = 20
                     x_roi_padded = max(0, x_roi - padding)
                     y_roi_padded = max(0, y_roi - padding)
-                    w_roi_padded = min(screenshot.width - x_roi_padded, w_roi + (2 * padding))
-                    h_roi_padded = min(screenshot.height - y_roi_padded, h_roi + (2 * padding))
+                    w_roi_padded = min(
+                        screenshot.width - x_roi_padded, w_roi + (2 * padding)
+                    )
+                    h_roi_padded = min(
+                        screenshot.height - y_roi_padded, h_roi + (2 * padding)
+                    )
 
-                    padded_roi = (x_roi_padded, y_roi_padded, w_roi_padded, h_roi_padded)
+                    padded_roi = (
+                        x_roi_padded,
+                        y_roi_padded,
+                        w_roi_padded,
+                        h_roi_padded,
+                    )
 
-                    tool_name, server_name = self.ocr_service.extract_tool_info(screenshot, padded_roi)
+                    tool_name, server_name = self.ocr_service.extract_tool_info(
+                        screenshot, padded_roi
+                    )
 
                     if tool_name:
-                        logger.info(f"Tool name found with dialog template {idx + 1}: {tool_name}")
+                        logger.info(
+                            f"Tool name found with dialog template {idx + 1}: {tool_name}"
+                        )
                         if self.is_tool_allowed(tool_name):
-                            logger.info(f"Tool {tool_name} is allowed, clicking approve button")
-                            button_clicked = self.find_and_click_button(screenshot, x, y)
+                            logger.info(
+                                f"Tool {tool_name} is allowed, clicking approve button"
+                            )
+                            button_clicked = self.find_and_click_button(
+                                screenshot, x, y
+                            )
                             return button_clicked, None
                         else:
-                            logger.warning(f"Tool {tool_name} not in allowed list, skipping approval")
+                            logger.warning(
+                                f"Tool {tool_name} not in allowed list, skipping approval"
+                            )
                             return False, "not_allowed"
                     else:
                         logger.info(
-                            f"No tool name found with dialog template {idx + 1}, trying next template if available")
+                            f"No tool name found with dialog template {idx + 1}, trying next template if available"
+                        )
 
             if dialog_found:
-                logger.warning("Dialog found but couldn't extract tool name from any template")
+                logger.warning(
+                    "Dialog found but couldn't extract tool name from any template"
+                )
             return False, None
 
         except pyautogui.ImageNotFoundException:
@@ -858,7 +966,7 @@ class AutoApprover:
 
     def debug_capture(self) -> None:
         """Capture a single screenshot and save debug information.
-        
+
         This method:
         1. Creates a debug directory if it doesn't exist
         2. Captures a screenshot of the Claude window
@@ -868,57 +976,67 @@ class AutoApprover:
         """
         debug_dir = self.config.debug_dir
         debug_dir.mkdir(exist_ok=True)
-        
+
         # Get window information
-        claude_window_id, window_info = self.window_manager.get_claude_window_with_cache()
-        
+        claude_window_id, window_info = (
+            self.window_manager.get_claude_window_with_cache()
+        )
+
         if not claude_window_id:
             logger.error("Could not find Claude window for debug capture")
             return
-        
+
         # Capture screenshot
         x, y, width, height = window_info
         timestamp = time.strftime("%Y%m%d-%H%M%S")
-        logger.info(f"Capturing debug screenshot of window at {x},{y} with size {width}x{height}")
-        
+        logger.info(
+            f"Capturing debug screenshot of window at {x},{y} with size {width}x{height}"
+        )
+
         # NOTE: Focusing code is disabled as requested
         # self.window_manager.focus_claude_window()
         # Short delay to ensure window is fully in foreground
         # time.sleep(0.5)
-        
+
         # Capture screenshots using both methods for comparison
         timestamp = time.strftime("%Y%m%d-%H%M%S")
-        logger.info(f"Capturing debug screenshots of window at {x},{y} with size {width}x{height}")
-        
+        logger.info(
+            f"Capturing debug screenshots of window at {x},{y} with size {width}x{height}"
+        )
+
         # Capture using direct window method (passing 0,0,0,0 to use CGRectNull)
-        direct_screenshot = self.window_manager.capture_window_screenshot(0, 0, 0, 0, claude_window_id)
+        direct_screenshot = self.window_manager.capture_window_screenshot(
+            0, 0, 0, 0, claude_window_id
+        )
         direct_screenshot_path = debug_dir / f"screenshot-direct-{timestamp}.png"
         direct_screenshot.save(direct_screenshot_path)
         logger.info(f"Saved direct-capture screenshot to {direct_screenshot_path}")
-        
+
         # Also capture using traditional screen method for comparison
-        screen_screenshot = self.window_manager.capture_window_screenshot(x, y, width, height)
+        screen_screenshot = self.window_manager.capture_window_screenshot(
+            x, y, width, height
+        )
         screen_screenshot_path = debug_dir / f"screenshot-screen-{timestamp}.png"
         screen_screenshot.save(screen_screenshot_path)
         logger.info(f"Saved screen-capture screenshot to {screen_screenshot_path}")
-        
+
         # Use the direct method for further processing
         screenshot = direct_screenshot
         screenshot_path = direct_screenshot_path
-        
+
         # Save copies of template images
         button_template_path = debug_dir / f"button_template-{timestamp}.png"
         self.template_manager.approve_button_template.save(button_template_path)
-        
+
         dialog_template_paths = []
         for idx, template in enumerate(self.template_manager.dialog_templates):
-            path = debug_dir / f"dialog_template-{idx+1}-{timestamp}.png"
+            path = debug_dir / f"dialog_template-{idx + 1}-{timestamp}.png"
             template.save(path)
             dialog_template_paths.append(path)
-        
+
         # Create HTML report
         html_report_path = debug_dir / f"debug_report-{timestamp}.html"
-        with open(html_report_path, 'w') as f:
+        with open(html_report_path, "w") as f:
             f.write(f"""<!DOCTYPE html>
 <html>
 <head>
@@ -967,24 +1085,25 @@ class AutoApprover:
     <h2>Dialog Templates</h2>
     <div class="image-container">
 """)
-            
+
             for idx, path in enumerate(dialog_template_paths):
                 f.write(f"""
         <div class="image-item">
-            <img src="{path.name}" alt="Dialog Template {idx+1}">
-            <div class="image-caption">Dialog Template {idx+1}</div>
+            <img src="{path.name}" alt="Dialog Template {idx + 1}">
+            <div class="image-caption">Dialog Template {idx + 1}</div>
         </div>""")
-            
+
             f.write("""
     </div>
 </body>
 </html>""")
-        
+
         logger.info(f"Created HTML debug report: {html_report_path}")
-        
+
         # Try to open the report in the default browser
         try:
             import webbrowser
+
             webbrowser.open(str(html_report_path))
             logger.info("Opened debug report in browser")
         except Exception as e:
@@ -1000,14 +1119,20 @@ class AutoApprover:
         Exits if Tesseract OCR is not properly configured.
         """
         if not self.ocr_service.configure_ocr():
-            logger.error("Cannot continue without Tesseract OCR. Please install it with 'brew install tesseract'")
+            logger.error(
+                "Cannot continue without Tesseract OCR. Please install it with 'brew install tesseract'"
+            )
             sys.exit(1)
 
-        logger.info(f"Starting auto-approval script for {self.config.claude_window_title}")
-        
+        logger.info(
+            f"Starting auto-approval script for {self.config.claude_window_title}"
+        )
+
         # If debug mode is enabled, just do a single capture and exit
         if self.config.debug_mode:
-            logger.info("Running in debug mode - will capture a single screenshot and exit")
+            logger.info(
+                "Running in debug mode - will capture a single screenshot and exit"
+            )
             self.debug_capture()
             logger.info("Debug capture complete. Exiting.")
             return
@@ -1020,13 +1145,13 @@ class AutoApprover:
                 result, reason = self.auto_approve()
 
                 if reason == "no_window":
-                    logger.info(f"Claude window not found")
+                    logger.info("Claude window not found")
                     current_delay = self.config.no_window_delay
                 elif reason == "image_not_found":
-                    logger.info(f"Approve button not found")
+                    logger.info("Approve button not found")
                     current_delay = self.config.no_image_delay
                 elif reason == "not_allowed":
-                    logger.info(f"Tool not allowed")
+                    logger.info("Tool not allowed")
                     current_delay = self.config.blocked_tool_delay
                 else:
                     current_delay = self.config.normal_delay
@@ -1040,23 +1165,39 @@ class AutoApprover:
 
 def main():
     """Main entry point with command-line argument handling.
-    
+
     Parses command-line arguments and runs the auto-approval script
     with the specified configuration.
     """
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Claude Auto-Approval Tool for macOS")
-    parser.add_argument("--debug", action="store_true", help="Run in debug mode (capture single screenshot and exit)")
-    parser.add_argument("--confidence", type=float, help="Button template matching confidence threshold (0.0-1.0)")
-    parser.add_argument("--dialog-confidence", type=float, help="Dialog template matching confidence threshold (0.0-1.0)")
-    parser.add_argument("--app-name", type=str, help="Claude application name to look for")
-    parser.add_argument("--list-windows", action="store_true", help="List all windows and exit")
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Run in debug mode (capture single screenshot and exit)",
+    )
+    parser.add_argument(
+        "--confidence",
+        type=float,
+        help="Button template matching confidence threshold (0.0-1.0)",
+    )
+    parser.add_argument(
+        "--dialog-confidence",
+        type=float,
+        help="Dialog template matching confidence threshold (0.0-1.0)",
+    )
+    parser.add_argument(
+        "--app-name", type=str, help="Claude application name to look for"
+    )
+    parser.add_argument(
+        "--list-windows", action="store_true", help="List all windows and exit"
+    )
     args = parser.parse_args()
-    
+
     # Initialize configuration
     config = Config()
-    
+
     # Apply command-line overrides
     if args.debug:
         config.debug_mode = True
@@ -1066,17 +1207,16 @@ def main():
         config.dialog_confidence = args.dialog_confidence
     if args.app_name is not None:
         config.claude_app_name = args.app_name
-    
+
     # Special mode to just list all windows
     if args.list_windows:
         window_manager = WindowManager()
         window_manager.list_all_windows()
         return
-    
+
     auto_approver = AutoApprover()
     auto_approver.run()
 
 
 if __name__ == "__main__":
     main()
-
