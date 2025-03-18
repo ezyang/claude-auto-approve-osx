@@ -96,16 +96,7 @@ Edit the `Config` class in `claude_auto_approve.py` to customize:
 
 ## macOS Limitations
 
-Unlike Windows, macOS has strict security limitations around window capture:
-
-1. **Window occlusion**: When a window is partially or completely covered by other windows, the screenshot will include those occlusions. This is a security feature of macOS.
-
-2. **Window focus**: The script attempts to bring Claude to the foreground before capturing, but this may not always succeed depending on your macOS settings and permissions.
-
-3. **Workarounds**:
-   - Keep Claude visible and unobstructed while the script is running
-   - Minimize other windows that might overlap with Claude
-   - Consider using a separate Space (virtual desktop) for Claude
+Button click doesn't work unless Claude Desktop is in foreground.
 
 ## Security Considerations
 
