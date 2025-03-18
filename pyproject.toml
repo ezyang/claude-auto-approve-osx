@@ -1,19 +1,14 @@
 [project]
 name = "claude-auto-approve-osx"
 version = "0.1.0"
-description = "Add your description here"
+description = "Claude tool auto-approval utility for macOS using Accessibility APIs"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "mss>=6.1.0",
-    "opencv-python>=4.5.0",
-    "pillow>=8.4.0",
-    "pyautogui>=0.9.53",
     "pyobjc-core==10.3.2",
     "pyobjc-framework-applicationservices==10.3.2",
     "pyobjc-framework-cocoa==10.3.2",
     "pyobjc-framework-quartz==10.3.2",
-    "pytesseract>=0.3.8",
 ]
 
 [dependency-groups]
@@ -27,4 +22,3 @@ requires       = ['hatchling']
 
 [project.scripts]
 claude-auto-approve-osx = "claude_auto_approve_osx:main"
-
