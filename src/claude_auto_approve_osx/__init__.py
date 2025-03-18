@@ -20,6 +20,12 @@ from claude_auto_approve_osx.window_focus import (
     activate_app_by_name,
     activate_app_by_bundle_id,
 )
+from claude_auto_approve_osx.accessibility_utils import (
+    get_application_by_name,
+    find_allow_button_in_claude,
+    perform_press_action,
+    dump_application_hierarchy,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -1220,7 +1226,7 @@ def main():
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Run in debug mode (capture single screenshot and exit)",
+        help="Run in debug mode (dump debug info and exit)",
     )
     parser.add_argument(
         "--confidence",
@@ -1237,6 +1243,16 @@ def main():
     )
     parser.add_argument(
         "--list-windows", action="store_true", help="List all windows and exit"
+    )
+    parser.add_argument(
+        "--use-screenshot",
+        action="store_true",
+        help="Use the screenshot-based approach instead of accessibility APIs",
+    )
+    parser.add_argument(
+        "--dump-accessibility",
+        action="store_true",
+        help="Dump the accessibility hierarchy for debugging",
     )
     args = parser.parse_args()
 
@@ -1258,8 +1274,21 @@ def main():
         window_manager = WindowManager()
         window_manager.list_all_windows()
         return
+        
+    # Special mode to dump accessibility hierarchy
+    if args.dump_accessibility:
+        approver = AccessibilityAutoApprover()
+        approver.debug_accessibility()
+        return
 
-    auto_approver = AutoApprover()
+    # Choose which auto-approver to use
+    if args.use_screenshot:
+        logger.info("Using screenshot-based auto-approver")
+        auto_approver = AutoApprover()
+    else:
+        logger.info("Using accessibility-based auto-approver")
+        auto_approver = AccessibilityAutoApprover()
+        
     auto_approver.run()
 
 
