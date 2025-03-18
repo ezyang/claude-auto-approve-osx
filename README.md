@@ -15,8 +15,8 @@ This is an OSX port of @Richard-Weiss's Windows auto-approver https://gist.githu
 
 1. Clone this repository:
 ```
-git clone https://github.com/yourusername/osx-clicker.git
-cd osx-clicker
+git clone https://github.com/ezyang/claude-auto-approve-osx
+cd claude-auto-approve-osx
 ```
 
 2. Install Tesseract OCR using Homebrew:
@@ -26,7 +26,7 @@ brew install tesseract
 
 3. Run
 ```
-uvx .
+uv run claude-auto-approve-osx
 ```
 
 ## Usage
@@ -65,6 +65,9 @@ This will:
 2. Save all templates and screenshots to a debug directory
 3. Generate an HTML report with all images for easy comparison
 4. Open the report in your browser
+
+Debugging works pretty well with [codemcp](https://github.com/ezyang/codemcp),
+which is how I made this port and debugged problems with it.
 
 ### Command Line Options
 
