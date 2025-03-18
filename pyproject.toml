@@ -21,8 +21,8 @@ dev = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.6,<0.7"]
-build-backend = "uv_build"
+build-backend  = 'hatchling.build'
+requires       = ['hatchling']
 
 [project.scripts]
 claude-auto-approve-osx = "claude_auto_approve_osx:main"
