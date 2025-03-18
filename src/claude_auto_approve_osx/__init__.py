@@ -7,13 +7,6 @@ import time
 from pathlib import Path
 from typing import Tuple, Optional, Self, Dict, Any
 
-from AppKit import NSWorkspace, NSApplicationActivateIgnoringOtherApps
-
-from claude_auto_approve_osx.window_focus import (
-    get_frontmost_app,
-    activate_app_by_name,
-    activate_app_by_bundle_id,
-)
 from claude_auto_approve_osx.accessibility_utils import (
     get_application_by_name,
     find_allow_button_in_claude,
@@ -101,13 +94,11 @@ class AccessibilityAutoApprover:
 
     Attributes:
         config: Configuration singleton with settings.
-        previous_foreground_app: Stores information about the previously focused app.
     """
 
     def __init__(self) -> None:
         """Initialize AccessibilityAutoApprover with required services and configuration."""
         self.config = Config()
-        self.previous_foreground_app = None
 
     def is_tool_allowed(self, tool_name: str) -> bool:
         """Check if the requested tool is in the allowed list.
@@ -124,9 +115,8 @@ class AccessibilityAutoApprover:
         """Find and click the 'Allow for This Chat' button using accessibility APIs.
 
         This method:
-        1. Finds the Claude application
-        2. Searches for the 'Allow for This Chat' button in any window/dialog
-        3. Presses the button if found
+        1. Searches for the 'Allow for This Chat' button in any window/dialog
+        2. Presses the button if found
 
         Returns:
             Tuple[bool, Optional[str]]:
@@ -135,9 +125,6 @@ class AccessibilityAutoApprover:
                   Possible values: "no_window", "button_not_found", "error"
         """
         try:
-            # Save the currently focused app before potentially switching
-            self.previous_foreground_app = get_frontmost_app()
-
             # Find the 'Allow for This Chat' button
             button = find_allow_button_in_claude()
 
@@ -148,29 +135,6 @@ class AccessibilityAutoApprover:
             # Press the button
             logger.info("Found and pressing 'Allow' button")
             success = perform_press_action(button)
-
-            # Restore the previously focused app
-            if self.previous_foreground_app:
-                # Only log at debug level
-                app_name = self.previous_foreground_app.get("name", "unknown")
-                logger.debug(f"Restoring previous foreground app: {app_name}")
-                
-                app_instance = self.previous_foreground_app.get("app_instance")
-                if app_instance:
-                    app_instance.activateWithOptions_(
-                        NSApplicationActivateIgnoringOtherApps
-                    )
-                else:
-                    # Fallback using bundle ID if app instance not available
-                    bundle_id = self.previous_foreground_app.get("bundle_id")
-                    if bundle_id:
-                        activate_app_by_bundle_id(bundle_id)
-                    else:
-                        # Last resort, try by name
-                        activate_app_by_name(
-                            self.previous_foreground_app.get("name", "")
-                        )
-                time.sleep(0.1)  # Short delay to ensure app is focused
 
             return not success, None
 
@@ -246,10 +210,9 @@ def main():
     parser = argparse.ArgumentParser(
         description="Claude Auto-Approval Tool for macOS",
         epilog=(
-            "This tool automatically manages window focus: when a tool request is detected, "
-            "it saves the currently active application, brings Claude to the foreground, "
-            "clicks the approval button, and restores the original application to foreground. "
-            "This allows you to continue working in other applications without disruption."
+            "This tool automatically detects when a tool request appears in Claude and "
+            "clicks the approval button, allowing you to continue working without "
+            "having to manually approve each request."
         ),
     )
     parser.add_argument(
