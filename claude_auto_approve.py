@@ -82,7 +82,9 @@ class Config:
             "ls",
             "Is",
             "google_search",
-            "read-file"
+            "read-file",
+            "codemep",
+            "codemcp",
         ]
         self.tool_pattern = re.compile(r"Run\s+(\S+)\s+from\s+(\S+)")
 
@@ -707,13 +709,13 @@ class AutoApprover:
         button_template = self.template_manager.approve_button_template
         logger.info(f"Button template size: {button_template.width}x{button_template.height}")
         logger.info(f"Screenshot size: {screenshot.width}x{screenshot.height}")
-        
+
         # Check template size
         if button_template.width > screenshot.width or button_template.height > screenshot.height:
             logger.error(f"Button template size ({button_template.width}x{button_template.height}) "
                         f"is larger than screenshot ({screenshot.width}x{screenshot.height})")
             return False
-        
+
         try:
             button_location = pyautogui.locate(
                 button_template,
@@ -728,13 +730,35 @@ class AutoApprover:
             button_tuple = (button_location.left, button_location.top,
                             button_location.width, button_location.height)
             rel_x, rel_y = pyautogui.center(button_tuple)
-            screen_x, screen_y = window_x + rel_x, window_y + rel_y
+            
+            # Get window size information from the raw window bounds
+            window_info = self.window_manager.get_window_info(self.window_manager.cached_window_id)
+            _, _, window_width, window_height = window_info
+            
+            # Calculate the scaling factor for Retina displays
+            # by comparing screenshot dimensions with window dimensions
+            scale_x = screenshot.width / window_width
+            scale_y = screenshot.height / window_height
+            
+            # Apply the scaling factor to the relative coordinates
+            scaled_rel_x = rel_x / scale_x
+            scaled_rel_y = rel_y / scale_y
+            
+            # Calculate the final screen position
+            screen_x, screen_y = window_x + scaled_rel_x, window_y + scaled_rel_y
+
+            # Log scaling information for debugging
+            logger.info(f"Window size from bounds: {window_width}x{window_height}")
+            logger.info(f"Screenshot size: {screenshot.width}x{screenshot.height}")
+            logger.info(f"Calculated scaling factors: X={scale_x}, Y={scale_y}")
+            logger.info(f"Button relative position: {rel_x}, {rel_y}")
+            logger.info(f"Scaled relative position: {scaled_rel_x}, {scaled_rel_y}")
 
             old_x, old_y = pyautogui.position()
-            
+
             # NOTE: Focusing code is disabled as requested
             # self.window_manager.focus_claude_window()
-            
+
             logger.info(f"Button found at {screen_x}, {screen_y}")
             pyautogui.click(screen_x, screen_y)
 
