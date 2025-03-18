@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=8.4.0",
     "pyautogui>=0.9.53",
     "pyobjc-core>=7.3",
+    "pyobjc-framework-applicationservices>=11.0",
     "pyobjc-framework-cocoa>=7.3",
     "pyobjc-framework-quartz>=7.3",
     "pytesseract>=0.3.8",
