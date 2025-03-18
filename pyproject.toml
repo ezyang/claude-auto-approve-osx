@@ -9,10 +9,10 @@ dependencies = [
     "opencv-python>=4.5.0",
     "pillow>=8.4.0",
     "pyautogui>=0.9.53",
-    "pyobjc-core>=7.3",
-    "pyobjc-framework-applicationservices>=11.0",
-    "pyobjc-framework-cocoa>=7.3",
-    "pyobjc-framework-quartz>=7.3",
+    "pyobjc-core==10.3.2",
+    "pyobjc-framework-applicationservices==10.3.2",
+    "pyobjc-framework-cocoa==10.3.2",
+    "pyobjc-framework-quartz==10.3.2",
     "pytesseract>=0.3.8",
 ]
 

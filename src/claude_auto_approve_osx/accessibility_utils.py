@@ -4,6 +4,7 @@ import time
 from AppKit import NSWorkspace, NSApplicationActivateIgnoringOtherApps
 import Quartz
 from ApplicationServices import AXUIElementCreateApplication, AXUIElementCopyAttributeValue
+import HIServices
 
 logger = logging.getLogger(__name__)
 
@@ -178,8 +179,13 @@ def perform_press_action(element):
     if element is None:
         return False
         
-    error = Quartz.AXUIElementPerformAction(element, "AXPress")
-    return error == 0
+    logger.info("Pressing")
+    #error = Quartz.AXUIElementPerformAction(element, "AXPress")
+    breakpoint()
+    HIServices.AXUIElementPerformAction(element, "AXPress")
+    logger.info("Press result")
+    #return error == 0
+    return True
 
 def get_application_by_name(app_name):
     """Get an application's accessibility element by name.

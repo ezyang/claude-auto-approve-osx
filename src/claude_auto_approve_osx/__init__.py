@@ -1289,7 +1289,7 @@ class AccessibilityAutoApprover:
             return not success, None
             
         except Exception as e:
-            logger.error(f"Error in auto_approve (accessibility): {e}")
+            logger.error(f"Error in auto_approve (accessibility): {e}", exc_info=True)
             return False, "error"
             
     def debug_accessibility(self) -> None:
