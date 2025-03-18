@@ -1007,7 +1007,7 @@ class AutoApprover:
             logger.error(f"Error in auto_approve: {e}")
             return False, "error"
 
-def debug_capture(self) -> None:
+    def debug_capture(self) -> None:
         """Capture a single screenshot and save debug information.
 
         This method:
