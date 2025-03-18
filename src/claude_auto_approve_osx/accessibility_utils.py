@@ -123,7 +123,7 @@ def find_element_with_role_and_title(parent, role, title=None):
     
     # If this element matches the criteria, return it
     if role_value == role:
-        if title is None or (title_value and title.lower() in title_value.lower()):
+        if title is None or (title_value and (title_value == title)):
             return parent
     
     # Recursively check children
@@ -444,8 +444,8 @@ def find_allow_button_in_claude():
                 for btn in all_buttons:
                     title = get_ax_attribute_value(btn, "AXTitle")
                     all_discovered_buttons.append(title)
-                    if title and "Allow" in title:
-                        logger.info(f"✓ Found allow button with title: '{title}'")
+                    if title and title == "Allow for This Chat":
+                        logger.info(f"✓ Found exact 'Allow for This Chat' button in dialog")
                         return btn
                         
                 # Check if there's text mentioning "codemcp" in the dialog
@@ -490,8 +490,8 @@ def find_allow_button_in_claude():
         for btn in all_buttons:
             title = get_ax_attribute_value(btn, "AXTitle")
             all_discovered_buttons.append(title)
-            if title and "Allow" in title and "don't" not in title.lower():
-                logger.info(f"✓ Found allow button with title: '{title}' directly in window")
+            if title and title == "Allow for This Chat":
+                logger.info(f"✓ Found exact 'Allow for This Chat' button directly in window")
                 return btn
     
     # Log all discovered buttons for debugging
