@@ -12,13 +12,14 @@ from claude_auto_approve_osx.accessibility_utils import (
     perform_press_action,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
 class AccessibilityAutoApprover:
-    """Automatically approves tool requests in the Claude desktop app using macOS Accessibility APIs.
-    """
+    """Automatically approves tool requests in the Claude desktop app using macOS Accessibility APIs."""
 
     def auto_approve(self) -> Tuple[bool, Optional[str]]:
         """Find and click the 'Allow for This Chat' button using accessibility APIs.
