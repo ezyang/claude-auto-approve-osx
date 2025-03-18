@@ -419,27 +419,27 @@ def find_allow_button_in_claude():
         
         # First try to find a dialog that might be the tool confirmation dialog
         for dialog_role in ["AXSheet", "AXDialog", "AXGroup"]:
-            logger.info(f"Looking for dialog role: {dialog_role}")
+            logger.debug(f"Looking for dialog role: {dialog_role}")
             dialogs = find_all_elements_with_role(window, dialog_role)
-            logger.info(f"Found {len(dialogs)} elements with role {dialog_role}")
+            logger.debug(f"Found {len(dialogs)} elements with role {dialog_role}")
             
             all_discovered_dialogs.extend([(dialog_role, get_ax_attribute_value(d, "AXTitle") or "Untitled") for d in dialogs])
             
             for dialog_index, dialog in enumerate(dialogs):
                 dialog_title = get_ax_attribute_value(dialog, "AXTitle") or "Untitled Dialog"
-                logger.info(f"Checking dialog {dialog_index+1}/{len(dialogs)} with title: '{dialog_title}'")
+                logger.debug(f"Checking dialog {dialog_index+1}/{len(dialogs)} with title: '{dialog_title}'")
                 
                 # First try to find the exact button
-                logger.info("Looking for 'Allow for This Chat' button...")
+                logger.debug("Looking for 'Allow for This Chat' button...")
                 button = find_button_with_title(dialog, "Allow for This Chat")
                 if button:
                     logger.info("✓ Found 'Allow for This Chat' button in dialog")
                     return button
                 
                 # If not found, look for any button with "Allow" in its title
-                logger.info("Looking for any button with 'Allow' in title...")
+                logger.debug("Looking for any button with 'Allow' in title...")
                 all_buttons = find_all_elements_with_role(dialog, "AXButton")
-                logger.info(f"Found {len(all_buttons)} buttons in dialog")
+                logger.debug(f"Found {len(all_buttons)} buttons in dialog")
                 
                 for btn in all_buttons:
                     title = get_ax_attribute_value(btn, "AXTitle")
@@ -460,10 +460,8 @@ def find_allow_button_in_claude():
                         logger.debug(f"Text content: {text_value[:100]}...")
                     if text_value and "codemcp" in text_value.lower():
                         # If we found a dialog about codemcp, look harder for any button
-                        logger.info("✓ Found dialog mentioning 'codemcp'")
                         codemcp_found = True
                         all_buttons = find_all_elements_with_role(dialog, "AXButton")
-                        logger.info(f"Looking through {len(all_buttons)} buttons for approval button")
                         # Return the first button that isn't "Don't Allow"
                         for btn in all_buttons:
                             title = get_ax_attribute_value(btn, "AXTitle")
